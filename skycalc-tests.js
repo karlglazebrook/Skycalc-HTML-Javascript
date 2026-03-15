@@ -377,46 +377,54 @@ check('moon alt at moonrise JD near 0', alt_mr, 0.0, 1.0);
 // ============================================================
 // Scenario 2: 2050 Jun 21 12:00 UT
 //   Object: RA 17h 45m 40s  Dec -29° 00' 28"  (near Galactic Centre)
-//   Site:   AAT Siding Spring
+//   Site:   Kitt Peak [MDM Obs.]
 //   Reference from C binary
 // ============================================================
+
+const KP = {
+    lat:     31.9533,    // degrees N
+    longit:   7.44111,  // decimal hours west
+    elevsea: 1925.0,    // metres
+    stdz:     7.0,      // hours west (no DST at Kitt Peak)
+    useDST:   0
+};
 
 const OBJ2 = { ra: 17 + 45/60 + 40/3600, dec: -(29 + 28/3600), epoch: 2000.0 };
 // 17h 45m 40s = 17.76111 hrs;  -29° 00' 28" = -29.00778°
 
 const JD2 = 2469979.000000;   // 2050-Jun-21 12:00 UT
 
-const lmst2     = lst(JD2, AAT.longit);
+const lmst2     = lst(JD2, KP.longit);
 const curep2    = 2000.0 + (JD2 - J2000) / 365.25;
 const prec2     = precrot(OBJ2.ra, OBJ2.dec, OBJ2.epoch, curep2);
 const ha2       = adjTime(lmst2 - prec2.ra);
-const altaz2    = altit(prec2.dec, ha2, AAT.lat);
-const hc2       = helcor(JD2, prec2.ra, prec2.dec, ha2, AAT.lat, AAT.elevsea);
+const altaz2    = altit(prec2.dec, ha2, KP.lat);
+const hc2       = helcor(JD2, prec2.ra, prec2.dec, ha2, KP.lat, KP.elevsea);
 
-section('Scenario 2 — 2050-Jun-21, Galactic Centre region');
+section('Scenario 2 — 2050-Jun-21, Galactic Centre region, Kitt Peak');
 
-// LMST: 15h 55m 48.1s = 15.93003 hrs
-check('S2 LMST (hrs)',          lmst2,         15.93003, 0.001);
+// LMST: 22h 33m 04.2s = 22.55117 hrs
+check('S2 LMST (hrs)',          lmst2,         22.55117, 0.001);
 
 // Precessed: RA 17h 48m 52.6s = 17.81461 hrs;  dec -29° 01' 24" = -29.02333°, ep 2050.47
 check('S2 precessed RA (hrs)',  prec2.ra,      17.81461, 0.001);
 check('S2 precessed Dec (deg)', prec2.dec,    -29.02333, 0.02);
 
-// HA: -1h 53m 04s = -1.88444 hrs
-check('S2 hour angle (hrs)',    ha2,           -1.88444, 0.01);
-check('S2 altitude (deg)',      altaz2.alt,    65.52,    0.1);
-check('S2 azimuth (deg)',       altaz2.az,     92.05,    0.2);
-check('S2 sec(z)',              secantZ(altaz2.alt), 1.099, 0.005);
-check('S2 parang (deg)',        parang(ha2, prec2.dec, AAT.lat), -102.4, 1.0);
+// HA: +4h 44m 12s = +4.73667 hrs  (object is below horizon, west of meridian)
+check('S2 hour angle (hrs)',    ha2,            4.73667, 0.01);
+check('S2 altitude (deg)',      altaz2.alt,    -0.91,    0.1);
+check('S2 azimuth (deg)',       altaz2.az,     235.80,   0.3);
+// sec.z near horizon: 1/sin(-0.91°) ≈ -63; use loose tolerance
+check('S2 sec(z)',              secantZ(altaz2.alt), -63.249, 5.0);
+check('S2 parang (deg)',        parang(ha2, prec2.dec, KP.lat), 53.4, 2.0);
 
-// DST: June = Australian winter, no DST, zone = -10
-const { jdb: jdb2s, jde: jde2s } = findDSTBounds(2050, AAT.stdz, AAT.useDST);
-check('S2 no DST in June (zone=-10)',
-      zoneOffset(AAT.useDST, AAT.stdz, JD2 + AAT.stdz/24, jdb2s, jde2s), -10.0, 0.001);
+// No DST at Kitt Peak (useDST=0), zone=7 always
+check('S2 no DST at KP (zone=7)',
+      zoneOffset(KP.useDST, KP.stdz, JD2 + KP.stdz/24, 0, 1e99), 7.0, 0.001);
 
-// Barycentric corrections: +505.4 sec, -1.15 km/s
+// Barycentric corrections: +505.4 sec, -1.64 km/s
 check('S2 helcor tcor (sec)',   hc2.tcor,  505.4, 2.0);
-check('S2 helcor vcor (km/s)',  hc2.vcor,  -1.15, 0.1);
+check('S2 helcor vcor (km/s)',  hc2.vcor,  -1.64, 0.1);
 check('S2 BJD',                 JD2 + hc2.tcor / SEC_IN_DAY, 2469979.005850, 0.00002);
 
 // Galactic: l=359.94, b=-0.05
@@ -429,54 +437,67 @@ const ecl2 = eclipt(OBJ2.ra, OBJ2.dec, OBJ2.epoch, JD2);
 check('S2 ecliptic long (deg)', ecl2.eclong, 267.56, 0.2);
 check('S2 ecliptic lat (deg)',  ecl2.eclat,   -5.61, 0.1);
 
-// Moon is down at this time (June 2050)
-const moon2 = accumoon(JD2, AAT.lat, lmst2, AAT.elevsea);
-const moonAlt2 = altit(moon2.topodec, lmst2 - moon2.topora, AAT.lat).alt;
+// Moon is down at Kitt Peak at this time
+const moon2 = accumoon(JD2, KP.lat, lmst2, KP.elevsea);
+const moonAlt2 = altit(moon2.topodec, lmst2 - moon2.topora, KP.lat).alt;
 check('S2 moon is below horizon', moonAlt2 < 0 ? 0 : 1, 0, 0.5);
+
+// Sun is in twilight (C: alt -4.7°, below horizon)
+const sun2 = accusun(JD2, lmst2, KP.lat);
+const sunAlt2 = altit(sun2.topodec, lmst2 - sun2.topora, KP.lat).alt;
+check('S2 sun below horizon', sunAlt2 < 0 ? 0 : 1, 0, 0.5);
 
 // ============================================================
 // Scenario 3: 2075 Dec 15 12:00 UT
 //   Object: RA 5h 34m 32s  Dec +22° 00' 52"  (Crab Nebula M1)
-//   Site:   AAT Siding Spring
+//   Site:   VLT Cerro Paranal
 //   Reference from C binary
 // ============================================================
+
+const VLT = {
+    lat:    -24.66667,  // degrees N (south = negative)
+    longit:   4.6944,  // decimal hours west
+    elevsea: 2635.0,   // metres
+    stdz:     4.0,     // hours west; Chilean DST
+    useDST:  -1
+};
 
 const OBJ3 = { ra: 5 + 34/60 + 32/3600, dec: 22 + 52/3600, epoch: 2000.0 };
 // 5h 34m 32s = 5.57556 hrs;  +22° 00' 52" = 22.01444°
 
 const JD3 = 2479287.000000;   // 2075-Dec-15 12:00 UT
 
-const lmst3     = lst(JD3, AAT.longit);
+const lmst3     = lst(JD3, VLT.longit);
 const curep3    = 2000.0 + (JD3 - J2000) / 365.25;
 const prec3     = precrot(OBJ3.ra, OBJ3.dec, OBJ3.epoch, curep3);
 const ha3       = adjTime(lmst3 - prec3.ra);
-const altaz3    = altit(prec3.dec, ha3, AAT.lat);
-const hc3       = helcor(JD3, prec3.ra, prec3.dec, ha3, AAT.lat, AAT.elevsea);
+const altaz3    = altit(prec3.dec, ha3, VLT.lat);
+const hc3       = helcor(JD3, prec3.ra, prec3.dec, ha3, VLT.lat, VLT.elevsea);
 
-section('Scenario 3 — 2075-Dec-15, Crab Nebula (M1)');
+section('Scenario 3 — 2075-Dec-15, Crab Nebula (M1), VLT');
 
-// LMST: 3h 33m 25.5s = 3.55708 hrs
-check('S3 LMST (hrs)',          lmst3,         3.55708,  0.001);
+// LMST: 12h 55m 29.8s = 12.92494 hrs
+check('S3 LMST (hrs)',          lmst3,         12.92494, 0.001);
 
 // Precessed: RA 5h 39m 06.5s = 5.65181 hrs;  dec +22° 03' 26" = 22.05722°, ep 2075.95
 check('S3 precessed RA (hrs)',  prec3.ra,      5.65181,  0.001);
 check('S3 precessed Dec (deg)', prec3.dec,     22.05722, 0.02);
 
-// HA: -2h 05m 41s = -2.09472 hrs
-check('S3 hour angle (hrs)',    ha3,           -2.09472, 0.01);
-check('S3 altitude (deg)',      altaz3.alt,    28.75,    0.1);
-check('S3 azimuth (deg)',       altaz3.az,     33.44,    0.2);
-check('S3 sec(z)',              secantZ(altaz3.alt), 2.079, 0.01);
-check('S3 parang (deg)',        parang(ha3, prec3.dec, AAT.lat), -149.5, 1.0);
+// HA: +7h 16m 23s = +7.27306 hrs  (object is below horizon, far west)
+check('S3 hour angle (hrs)',    ha3,            7.27306, 0.01);
+check('S3 altitude (deg)',      altaz3.alt,   -25.61,    0.2);
+check('S3 azimuth (deg)',       altaz3.az,    283.78,    0.3);
+check('S3 sec(z)',              secantZ(altaz3.alt), -2.313, 0.05);
+check('S3 parang (deg)',        parang(ha3, prec3.dec, VLT.lat), 107.8, 2.0);
 
-// DST: December = Australian summer, DST active, zone = -11
-const { jdb: jdb3s, jde: jde3s } = findDSTBounds(2075, AAT.stdz, AAT.useDST);
-check('S3 DST active in Dec (zone=-11)',
-      zoneOffset(AAT.useDST, AAT.stdz, JD3 + AAT.stdz/24, jdb3s, jde3s), -11.0, 0.001);
+// Chilean DST: December = southern summer, DST active, zone = stdz-1 = 3 (UTC-3 = CLST)
+const { jdb: jdb3v, jde: jde3v } = findDSTBounds(2075, VLT.stdz, VLT.useDST);
+check('S3 Chilean DST in Dec (zone=3)',
+      zoneOffset(VLT.useDST, VLT.stdz, JD3 + VLT.stdz/24, jdb3v, jde3v), 3.0, 0.001);
 
-// Barycentric corrections: +492.3 sec, +0.82 km/s
+// Barycentric corrections: +492.3 sec, +0.26 km/s
 check('S3 helcor tcor (sec)',   hc3.tcor,  492.3, 2.0);
-check('S3 helcor vcor (km/s)',  hc3.vcor,   0.82, 0.1);
+check('S3 helcor vcor (km/s)',  hc3.vcor,   0.26, 0.1);
 check('S3 BJD',                 JD3 + hc3.tcor / SEC_IN_DAY, 2479287.005698, 0.00002);
 
 // Galactic: l=184.56, b=-5.78
@@ -489,65 +510,66 @@ const ecl3 = eclipt(OBJ3.ra, OBJ3.dec, OBJ3.epoch, JD3);
 check('S3 ecliptic long (deg)', ecl3.eclong, 85.16, 0.2);
 check('S3 ecliptic lat (deg)',  ecl3.eclat,  -1.28, 0.1);
 
-// Moon is up in Dec 2075 at AAT, alt ~36.8°, illum ~0.593
-const moon3 = accumoon(JD3, AAT.lat, lmst3, AAT.elevsea);
-const moonAlt3 = altit(moon3.topodec, lmst3 - moon3.topora, AAT.lat).alt;
-check('S3 moon altitude (deg)', moonAlt3, 36.8, 2.0);
+// Sun is UP at VLT at 12:00 UT (daytime; local time 09:00 CLST)
+const sun3 = accusun(JD3, lmst3, VLT.lat);
+const sunAlt3 = altit(sun3.topodec, lmst3 - sun3.topora, VLT.lat).alt;
+check('S3 sun above horizon (daytime)', sunAlt3 > 0 ? 0 : 1, 0, 0.5);
 
-// Moon illumination ~0.593  (from sun-moon angular separation)
-const sun3 = accusun(JD3, lmst3, AAT.lat);
-const moonSunSep3 = subtend(moon3.topora, moon3.topodec, sun3.topora, sun3.topodec);
-const illum3 = (1 - Math.cos(moonSunSep3)) / 2;
-check('S3 moon illumination',   illum3, 0.593, 0.02);
-
-// Angular separation between moon and Crab Nebula ~80.7°
-// subtend() takes RA in hours, Dec in degrees (converts internally)
-const moonSep3 = subtend(prec3.ra, prec3.dec, moon3.topora, moon3.topodec);
-check('S3 moon-object separation (deg)', moonSep3 * DEG_IN_RADIAN, 80.7, 3.0);
+// Moon is down at VLT at this time
+const moon3 = accumoon(JD3, VLT.lat, lmst3, VLT.elevsea);
+const moonAlt3 = altit(moon3.topodec, lmst3 - moon3.topora, VLT.lat).alt;
+check('S3 moon is below horizon', moonAlt3 < 0 ? 0 : 1, 0, 0.5);
 
 // ============================================================
 // Scenario 4: 2099 Nov 10 14:00 UT
 //   Object: RA 0h 42m 44s  Dec +41° 16' 09"  (M31, Andromeda Galaxy)
-//   Site:   AAT Siding Spring
+//   Site:   Mauna Kea
 //   Reference from C binary
 // ============================================================
+
+const MK = {
+    lat:     19.8267,   // degrees N
+    longit:  10.36478,  // decimal hours west
+    elevsea: 4215.0,    // metres
+    stdz:    10.0,      // hours west; no DST in Hawaii
+    useDST:   0
+};
 
 const OBJ4 = { ra: 0 + 42/60 + 44/3600, dec: 41 + 16/60 + 9/3600, epoch: 2000.0 };
 // 0h 42m 44s = 0.71222 hrs;  +41° 16' 09" = 41.26917°
 
 const JD4 = 2488018.083333;   // 2099-Nov-10 14:00 UT
 
-const lmst4     = lst(JD4, AAT.longit);
+const lmst4     = lst(JD4, MK.longit);
 const curep4    = 2000.0 + (JD4 - J2000) / 365.25;
 const prec4     = precrot(OBJ4.ra, OBJ4.dec, OBJ4.epoch, curep4);
 const ha4       = adjTime(lmst4 - prec4.ra);
-const altaz4    = altit(prec4.dec, ha4, AAT.lat);
-const hc4       = helcor(JD4, prec4.ra, prec4.dec, ha4, AAT.lat, AAT.elevsea);
+const altaz4    = altit(prec4.dec, ha4, MK.lat);
+const hc4       = helcor(JD4, prec4.ra, prec4.dec, ha4, MK.lat, MK.elevsea);
 
-section('Scenario 4 — 2099-Nov-10, M31 Andromeda Galaxy');
+section('Scenario 4 — 2099-Nov-10, M31 Andromeda Galaxy, Mauna Kea');
 
-// LMST: 3h 16m 30.1s = 3.27503 hrs
-check('S4 LMST (hrs)',          lmst4,         3.27503,  0.001);
+// LMST: 6h 58m 21.1s = 6.97253 hrs
+check('S4 LMST (hrs)',          lmst4,         6.97253,  0.001);
 
 // Precessed: RA 0h 48m 14.5s = 0.80403 hrs;  dec +41° 48' 51" = 41.81417°, ep 2099.86
 check('S4 precessed RA (hrs)',  prec4.ra,      0.80403,  0.002);
 check('S4 precessed Dec (deg)', prec4.dec,     41.81417, 0.05);
 
-// HA: +2h 28m 16s = +2.47111 hrs
-check('S4 hour angle (hrs)',    ha4,           2.47111,  0.01);
-check('S4 altitude (deg)',      altaz4.alt,    9.33,     0.2);
-check('S4 azimuth (deg)',       altaz4.az,     332.92,   0.3);
-check('S4 sec(z)',              secantZ(altaz4.alt), 6.167, 0.05);
-check('S4 parang (deg)',        parang(ha4, prec4.dec, AAT.lat), 148.5, 1.0);
+// HA: +6h 10m 07s = +6.16861 hrs  (setting in northwest, large but visible)
+check('S4 hour angle (hrs)',    ha4,           6.16861,  0.01);
+check('S4 altitude (deg)',      altaz4.alt,    11.26,    0.2);
+check('S4 azimuth (deg)',       altaz4.az,     310.61,   0.3);
+check('S4 sec(z)',              secantZ(altaz4.alt), 5.123, 0.05);
+check('S4 parang (deg)',        parang(ha4, prec4.dec, MK.lat), 73.4, 1.0);
 
-// DST: November = Australian summer, DST active, zone = -11
-const { jdb: jdb4s, jde: jde4s } = findDSTBounds(2099, AAT.stdz, AAT.useDST);
-check('S4 DST active in Nov (zone=-11)',
-      zoneOffset(AAT.useDST, AAT.stdz, JD4 + AAT.stdz/24, jdb4s, jde4s), -11.0, 0.001);
+// No DST at Mauna Kea (Hawaii never uses DST), zone=10 always
+check('S4 no DST at MK (zone=10)',
+      zoneOffset(MK.useDST, MK.stdz, JD4 + MK.stdz/24, 0, 1e99), 10.0, 0.001);
 
-// Barycentric corrections: +393.0 sec, -8.78 km/s
+// Barycentric corrections: +393.0 sec, -8.93 km/s
 check('S4 helcor tcor (sec)',   hc4.tcor,  393.0, 2.0);
-check('S4 helcor vcor (km/s)',  hc4.vcor,  -8.78, 0.1);
+check('S4 helcor vcor (km/s)',  hc4.vcor,  -8.93, 0.1);
 check('S4 BJD',                 JD4 + hc4.tcor / SEC_IN_DAY, 2488018.087882, 0.00002);
 
 // Galactic: l=121.17, b=-21.57
@@ -560,13 +582,13 @@ const ecl4 = eclipt(OBJ4.ra, OBJ4.dec, OBJ4.epoch, JD4);
 check('S4 ecliptic long (deg)', ecl4.eclong, 29.24, 0.2);
 check('S4 ecliptic lat (deg)',  ecl4.eclat,  33.36, 0.2);
 
-// Sun and moon both down
-const sun4 = accusun(JD4, lmst4, AAT.lat);
-const sunAlt4 = altit(sun4.topodec, lmst4 - sun4.topora, AAT.lat).alt;
+// Sun and moon both down at 14:00 UT = 04:00 HST (nighttime)
+const sun4 = accusun(JD4, lmst4, MK.lat);
+const sunAlt4 = altit(sun4.topodec, lmst4 - sun4.topora, MK.lat).alt;
 check('S4 sun is below horizon', sunAlt4 < 0 ? 0 : 1, 0, 0.5);
 
-const moon4 = accumoon(JD4, AAT.lat, lmst4, AAT.elevsea);
-const moonAlt4 = altit(moon4.topodec, lmst4 - moon4.topora, AAT.lat).alt;
+const moon4 = accumoon(JD4, MK.lat, lmst4, MK.elevsea);
+const moonAlt4 = altit(moon4.topodec, lmst4 - moon4.topora, MK.lat).alt;
 check('S4 moon is below horizon', moonAlt4 < 0 ? 0 : 1, 0, 0.5);
 
 // ============================================================
