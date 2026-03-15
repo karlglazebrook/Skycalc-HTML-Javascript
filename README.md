@@ -111,7 +111,7 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 
 MIT — see [LICENSE](LICENSE).
 
-The original `skycalc.c` was distributed freely for academic and educational use by John Thorstensen.
+The `skycalc.c` included in this repository is Karl Glazebrook's personal modified version of Thorstensen's original, accumulated over many years of observatory use — including, for example, the addition of the Anglo-Australian Telescope site as the default. It was distributed freely by Thorstensen for academic and educational use.
 
 ---
 
