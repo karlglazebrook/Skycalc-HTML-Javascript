@@ -1,0 +1,1455 @@
+// skycalc-math.js
+// JavaScript port of skycalc.c astronomical math functions
+// by John Thorstensen; ported by Karl Glazebrook / Claude
+// Run with: /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc skycalc-math.js
+
+// ============================================================
+// SECTION 1: Constants
+// ============================================================
+
+const PI            = 3.14159265358979;
+const ARCSEC_IN_RADIAN = 206264.8062471;
+const DEG_IN_RADIAN = 57.2957795130823;
+const HRS_IN_RADIAN = 3.819718634205;
+const KMS_AUDAY     = 1731.45683633;
+const SS_MASS       = 1.00134198;
+const J2000         = 2451545.0;
+const SEC_IN_DAY    = 86400.0;
+const FLATTEN       = 0.003352813;
+const EQUAT_RAD     = 6378137.0;
+const ASTRO_UNIT    = 1.4959787066e11;
+const EARTH_DIFF    = 0.05;
+
+// ============================================================
+// SECTION 2: Basic math utilities
+// ============================================================
+
+function atanCirc(x, y) {
+    // Returns radian angle 0 to 2pi for coords x, y
+    let theta;
+    if (x === 0.0) {
+        if (y > 0.0) theta = PI / 2.0;
+        else if (y < 0.0) theta = 3.0 * PI / 2.0;
+        else theta = 0.0;
+    } else {
+        theta = Math.atan(y / x);
+    }
+    if (x < 0.0) theta = theta + PI;
+    if (theta < 0.0) theta = theta + 2.0 * PI;
+    return theta;
+}
+
+function circulo(x) {
+    // Modulo 360 degrees (angle in degrees)
+    const n = Math.trunc(x / 360.0);
+    return x - 360.0 * n;
+}
+
+function adjTime(x) {
+    // Adjusts decimal hours to be between -12 and 12
+    while (x > 12.0)  x -= 24.0;
+    while (x < -12.0) x += 24.0;
+    return x;
+}
+
+function subtend(ra1, dec1, ra2, dec2) {
+    // Angle between two positions in radians. RA in decimal hours, dec in degrees.
+    ra1  = ra1  / HRS_IN_RADIAN;
+    dec1 = dec1 / DEG_IN_RADIAN;
+    ra2  = ra2  / HRS_IN_RADIAN;
+    dec2 = dec2 / DEG_IN_RADIAN;
+    let x1 = Math.cos(ra1) * Math.cos(dec1);
+    let y1 = Math.sin(ra1) * Math.cos(dec1);
+    let z1 = Math.sin(dec1);
+    let x2 = Math.cos(ra2) * Math.cos(dec2);
+    let y2 = Math.sin(ra2) * Math.cos(dec2);
+    let z2 = Math.sin(dec2);
+    let theta = Math.acos(x1*x2 + y1*y2 + z1*z2);
+    if (theta < 1.0e-5) {
+        if (Math.abs(dec1) < (PI/2.0 - 0.001) && Math.abs(dec2) < (PI/2.0 - 0.001)) {
+            x1 = (ra2 - ra1) * Math.cos((dec1 + dec2) / 2.0);
+            x2 = dec2 - dec1;
+            theta = Math.sqrt(x1*x1 + x2*x2);
+        }
+    }
+    return theta;
+}
+
+function minMaxAlt(lat, dec) {
+    // Returns {min, max} altitude for given lat and dec (degrees)
+    lat = lat / DEG_IN_RADIAN;
+    dec = dec / DEG_IN_RADIAN;
+    let xmax = Math.cos(dec) * Math.cos(lat) + Math.sin(dec) * Math.sin(lat);
+    let xmin = Math.sin(dec) * Math.sin(lat) - Math.cos(dec) * Math.cos(lat);
+    let max = (Math.abs(xmax) <= 1.0) ? Math.asin(xmax) * DEG_IN_RADIAN : 90.0;
+    let min = (Math.abs(xmin) <= 1.0) ? Math.asin(xmin) * DEG_IN_RADIAN : -90.0;
+    return { min, max };
+}
+
+// ============================================================
+// SECTION 3: Geometry (altitude, airmass, hour angle, parallactic)
+// ============================================================
+
+function altit(dec, ha, lat) {
+    // Returns {alt, az} (degrees). dec in degrees, ha in hours, lat in degrees.
+    dec = dec / DEG_IN_RADIAN;
+    ha  = ha  / HRS_IN_RADIAN;
+    lat = lat / DEG_IN_RADIAN;
+    const alt = DEG_IN_RADIAN * Math.asin(
+        Math.cos(dec) * Math.cos(ha) * Math.cos(lat) + Math.sin(dec) * Math.sin(lat));
+    const y =  Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.cos(ha) * Math.sin(lat);
+    const z = -1.0 * Math.cos(dec) * Math.sin(ha);
+    const az = atanCirc(y, z) * DEG_IN_RADIAN;
+    return { alt, az };
+}
+
+function secantZ(alt) {
+    // Secant of zenith angle, clamped to +/-100
+    let secz;
+    if (alt !== 0) secz = 1.0 / Math.sin(alt / DEG_IN_RADIAN);
+    else secz = 100.0;
+    if (secz >  100.0) secz =  100.0;
+    if (secz < -100.0) secz = -100.0;
+    return secz;
+}
+
+function haAlt(dec, lat, alt) {
+    // Hour angle at which object at dec is at altitude alt.
+    // Returns 1000 (always higher) or -1000 (always lower) if never at alt.
+    const mm = minMaxAlt(lat, dec);
+    if (alt < mm.min) return 1000.0;
+    if (alt > mm.max) return -1000.0;
+    dec  = (0.5 * PI) - dec / DEG_IN_RADIAN;
+    lat  = (0.5 * PI) - lat / DEG_IN_RADIAN;
+    const coalt = (0.5 * PI) - alt / DEG_IN_RADIAN;
+    const x = (Math.cos(coalt) - Math.cos(dec) * Math.cos(lat)) / (Math.sin(dec) * Math.sin(lat));
+    if (Math.abs(x) <= 1.0) return Math.acos(x) * HRS_IN_RADIAN;
+    return 1000.0;
+}
+
+function parang(ha, dec, lat) {
+    // Parallactic angle in degrees. ha in hours, dec & lat in degrees.
+    ha  = ha  / HRS_IN_RADIAN;
+    dec = dec / DEG_IN_RADIAN;
+    lat = lat / DEG_IN_RADIAN;
+
+    const denom = Math.sqrt(1.0 - Math.pow(Math.sin(lat)*Math.sin(dec) +
+                  Math.cos(lat)*Math.cos(dec)*Math.cos(ha), 2.0));
+    const sineta = (denom !== 0.0) ? Math.sin(ha) * Math.cos(lat) / denom : 0.0;
+
+    if (lat >= 0.0) {
+        // Northern hemisphere
+        if (dec < lat) return Math.asin(sineta) * DEG_IN_RADIAN;
+        else {
+            const colat = PI / 2.0 - lat;
+            const codec = PI / 2.0 - dec;
+            let hacrit = 1.0 - Math.pow(Math.cos(colat), 2.0) / Math.pow(Math.cos(codec), 2.0);
+            hacrit = Math.sqrt(hacrit) / Math.sin(colat);
+            if (Math.abs(hacrit) <= 1.0) hacrit = Math.asin(hacrit);
+            if (Math.abs(ha) > Math.abs(hacrit)) return Math.asin(sineta) * DEG_IN_RADIAN;
+            else if (ha > 0) return (PI - Math.asin(sineta)) * DEG_IN_RADIAN;
+            else return (-1.0 * PI - Math.asin(sineta)) * DEG_IN_RADIAN;
+        }
+    } else {
+        // Southern hemisphere
+        if (dec > lat) {
+            if (ha >= 0) return (PI - Math.asin(sineta)) * DEG_IN_RADIAN;
+            else return -1.0 * (PI + Math.asin(sineta)) * DEG_IN_RADIAN;
+        } else {
+            const colat = -1.0 * PI / 2.0 - lat;
+            const codec = PI / 2.0 - dec;
+            let hacrit = 1.0 - Math.pow(Math.cos(colat), 2.0) / Math.pow(Math.cos(codec), 2.0);
+            hacrit = Math.sqrt(hacrit) / Math.sin(colat);
+            if (Math.abs(hacrit) <= 1.0) hacrit = Math.asin(hacrit);
+            if (Math.abs(ha) > Math.abs(hacrit)) {
+                if (ha >= 0) return (PI - Math.asin(sineta)) * DEG_IN_RADIAN;
+                else return -1.0 * (PI + Math.asin(sineta)) * DEG_IN_RADIAN;
+            } else return Math.asin(sineta) * DEG_IN_RADIAN;
+        }
+    }
+}
+
+// ============================================================
+// SECTION 4: Geocentric coordinates
+// ============================================================
+
+function geocent(geolong, geolat, height) {
+    // geolong in decimal hours (west+), geolat in degrees, height in meters.
+    // Returns {x, y, z} in units of equatorial radii.
+    geolat  = geolat  / DEG_IN_RADIAN;
+    geolong = geolong / HRS_IN_RADIAN;
+    const denom = (1.0 - FLATTEN) * Math.sin(geolat);
+    const d2 = Math.cos(geolat) * Math.cos(geolat) + denom * denom;
+    let C_geo = 1.0 / Math.sqrt(d2);
+    let S_geo = (1.0 - FLATTEN) * (1.0 - FLATTEN) * C_geo;
+    C_geo += height / EQUAT_RAD;
+    S_geo += height / EQUAT_RAD;
+    const x = C_geo * Math.cos(geolat) * Math.cos(geolong);
+    const y = C_geo * Math.cos(geolat) * Math.sin(geolong);
+    const z = S_geo * Math.sin(geolat);
+    return { x, y, z };
+}
+
+function xyzCel(x, y, z) {
+    // Converts Cartesian unit vector to RA (decimal hours) and dec (degrees).
+    const mod = Math.sqrt(x*x + y*y + z*z);
+    x /= mod; y /= mod; z /= mod;
+    const xy = Math.sqrt(x*x + y*y);
+    let radian_ra, radian_dec;
+
+    if (xy < 1.0e-10) {
+        radian_ra = 0.0;
+        radian_dec = (z >= 0) ? PI / 2.0 : -PI / 2.0;
+    } else {
+        if (Math.abs(z / xy) < 3.0) radian_dec = Math.atan(z / xy);
+        else if (z >= 0.0) radian_dec = PI / 2.0 - Math.atan(xy / z);
+        else radian_dec = -PI / 2.0 - Math.atan(xy / z);
+
+        if (Math.abs(x) > 1.0e-10) {
+            if (Math.abs(y / x) < 3.0) radian_ra = Math.atan(y / x);
+            else if (x * y >= 0.0) radian_ra = PI / 2.0 - Math.atan(x / y);
+            else radian_ra = -PI / 2.0 - Math.atan(x / y);
+        } else {
+            radian_ra = PI / 2.0;
+            if (x * y <= 0.0) radian_ra = -radian_ra;
+        }
+        if (x < 0.0) radian_ra += PI;
+        if (radian_ra < 0.0) radian_ra += 2.0 * PI;
+    }
+    return { ra: radian_ra * HRS_IN_RADIAN, dec: radian_dec * DEG_IN_RADIAN };
+}
+
+// ============================================================
+// SECTION 5: Time and calendar
+// ============================================================
+
+function dateToJD(y, mo, d, h, mn, s) {
+    // Converts calendar date/time to Julian date (1900-2100 only).
+    // Uses C-style truncating integer division (Math.trunc).
+    let yr1 = 0, mo1 = 1;
+    const jdzpt = 1720982;
+    if (mo <= 2) { yr1 = -1; mo1 = 13; }
+    let jdint = Math.trunc(365.25 * (y + yr1));
+    const inter = Math.trunc(30.6001 * (mo + mo1));
+    jdint = jdint + inter + d + jdzpt;
+    let jdfrac = h / 24.0 + mn / 1440.0 + s / SEC_IN_DAY;
+    if (jdfrac < 0.5) { jdint--; jdfrac += 0.5; }
+    else               { jdfrac -= 0.5; }
+    return jdint + jdfrac;
+}
+
+function dayOfWeek(jd) {
+    // Returns day of week: 0=Mon, 6=Sun (matches C convention)
+    jd = jd + 0.5;
+    const i = Math.trunc(jd);
+    const x = i / 7.0 + 0.01;
+    return Math.trunc(7.0 * (x - Math.trunc(x)));
+}
+
+function caldat(jdin) {
+    // Converts Julian date to calendar date.
+    // Returns {y, mo, d, h, mn, s, dow}  (dow: 0=Mon, 6=Sun)
+    const IGREG = 2299161;
+    jdin = jdin + 0.5;
+    const jdint = Math.trunc(jdin);
+    const x = jdint / 7.0 + 0.01;
+    const dow = Math.trunc(7.0 * (x - Math.trunc(x)));
+    const jdfrac = jdin - jdint;
+    const h  = Math.trunc(jdfrac * 24.0);
+    const mn = Math.trunc((jdfrac - h / 24.0) * 1440.0);
+    const s  = (jdfrac - h / 24.0 - mn / 1440.0) * SEC_IN_DAY;
+
+    let ja, jb, jc, jd, je, jalpha;
+    if (jdint > IGREG) {
+        jalpha = Math.trunc(((jdint - 1867216) - 0.25) / 36524.25);
+        ja = jdint + 1 + jalpha - Math.trunc(0.25 * jalpha);
+    } else {
+        ja = jdint;
+    }
+    jb = ja + 1524;
+    jc = Math.trunc(6680.0 + ((jb - 2439870) - 122.1) / 365.25);
+    jd = Math.trunc(365 * jc + 0.25 * jc);
+    je = Math.trunc((jb - jd) / 30.6001);
+    const id = jb - jd - Math.trunc(30.6001 * je);
+    let mm = je - 1;
+    if (mm > 12) mm -= 12;
+    let iyyy = jc - 4715;
+    if (mm > 2) --iyyy;
+    if (iyyy <= 0) --iyyy;
+    return { y: iyyy, mo: mm, d: id, h, mn, s, dow };
+}
+
+function lst(jd, longit) {
+    // Local Mean Sidereal Time (decimal hours). longit in decimal hours (west+).
+    const jdin = Math.trunc(jd);
+    const jdint = jdin;
+    const jdfrac = jd - jdint;
+    let jdmid, ut;
+    if (jdfrac < 0.5) { jdmid = jdint - 0.5; ut = jdfrac + 0.5; }
+    else               { jdmid = jdint + 0.5; ut = jdfrac - 0.5; }
+    const t = (jdmid - J2000) / 36525.0;
+    let sid_g = (24110.54841 + 8640184.812866*t + 0.093104*t*t - 6.2e-6*t*t*t) / SEC_IN_DAY;
+    sid_g = sid_g - Math.trunc(sid_g);
+    sid_g = sid_g + 1.0027379093 * ut - longit / 24.0;
+    sid_g = sid_g - Math.trunc(sid_g);
+    sid_g = sid_g * 24.0;
+    if (sid_g < 0.0) sid_g += 24.0;
+    return sid_g;
+}
+
+function etcorr(jd) {
+    // Returns TDT - UT in seconds for the given Julian date.
+    const dates = [1900,1905,1910,1915,1920,1925,1930,1935,1940,1945,
+                   1950,1955,1960,1965,1970,1975,1980,1985,1990,1993];
+    const delts  = [-2.72,3.86,10.46,17.20,21.16,23.62,24.02,23.93,24.33,26.77,
+                    29.15,31.07,33.15,35.73,40.18,45.48,50.54,54.34,56.86,59.12];
+    const year = 1900.0 + (jd - 2415019.5) / 365.25;
+    let delt;
+    if (year < 1993.0 && year >= 1900.0) {
+        const i = Math.trunc((year - 1900) / 5);
+        delt = delts[i] + ((delts[i+1] - delts[i]) / (dates[i+1] - dates[i])) * (year - dates[i]);
+    } else if (year > 1993.0 && year < 2100.0) {
+        delt = 33.15 + 2.164e-3 * (jd - 2436935.4);
+    } else if (year < 1900.0) {
+        delt = 0.0;
+    } else {
+        delt = 180.0;
+    }
+    return delt;
+}
+
+// ============================================================
+// SECTION 6: DST handling
+// ============================================================
+
+function findDSTBounds(yr, stdz, useDST) {
+    // Returns {jdb, jde} - Julian dates of DST boundary transitions.
+    // For southern hemisphere (useDST < 0): jdb=start of STANDARD time, jde=start of DST.
+    if (useDST === 0) {
+        return { jdb: 1e99, jde: -1e99 };
+    }
+
+    let jdb, jde, d;
+
+    if (useDST === 1) {
+        // USA convention
+        if (yr >= 1986) {
+            d = 1;
+            while (dayOfWeek(dateToJD(yr, 4, d, 2, 0, 0)) !== 6) d++;
+        } else {
+            d = 30;
+            while (dayOfWeek(dateToJD(yr, 4, d, 2, 0, 0)) !== 6) d--;
+        }
+        jdb = dateToJD(yr, 4, d, 2, 0, 0) + stdz / 24.0;
+        d = 31;
+        while (dayOfWeek(dateToJD(yr, 10, d, 2, 0, 0)) !== 6) d--;
+        jde = dateToJD(yr, 10, d, 2, 0, 0) + (stdz - 1.0) / 24.0;
+    } else if (useDST === 2) {
+        // Spanish / Canary Islands
+        d = 31;
+        while (dayOfWeek(dateToJD(yr, 3, d, 2, 0, 0)) !== 6) d--;
+        jdb = dateToJD(yr, 3, d, 2, 0, 0) + stdz / 24.0;
+        d = 30;
+        while (dayOfWeek(dateToJD(yr, 9, d, 2, 0, 0)) !== 6) d--;
+        jde = dateToJD(yr, 9, d, 2, 0, 0) + (stdz - 1.0) / 24.0;
+    } else if (useDST === -1) {
+        // Chilean
+        d = 7;
+        while (dayOfWeek(dateToJD(yr, 4, d, 2, 0, 0)) !== 6) d++;
+        jdb = dateToJD(yr, 4, d, 2, 0, 0) + (stdz - 1.0) / 24.0;
+        d = 7;
+        while (dayOfWeek(dateToJD(yr, 9, d, 2, 0, 0)) !== 6) d++;
+        jde = dateToJD(yr, 9, d, 2, 0, 0) + stdz / 24.0;
+    } else if (useDST === -2) {
+        // Australian (AAT): off DST 1st Sun April, onto DST 1st Sun October
+        d = 1;
+        while (dayOfWeek(dateToJD(yr, 4, d, 2, 0, 0)) !== 6) d++;
+        jdb = dateToJD(yr, 4, d, 2, 0, 0) + (stdz - 1.0) / 24.0;
+        d = 1;
+        while (dayOfWeek(dateToJD(yr, 10, d, 2, 0, 0)) !== 6) d++;
+        jde = dateToJD(yr, 10, d, 2, 0, 0) + stdz / 24.0;
+    }
+    return { jdb, jde };
+}
+
+function zoneOffset(useDST, stdz, jd, jdb, jde) {
+    // Returns zone offset (hours west of UT, negative = east).
+    if (useDST === 0) return stdz;
+    else if ((jd > jdb) && (jd < jde) && (useDST > 0)) return stdz - 1.0;
+    else if (((jd < jdb) || (jd > jde)) && (useDST < 0)) return stdz - 1.0;
+    else return stdz;
+}
+
+function trueJD(y, mo, d, h, mn, s, useDST, enterUT, nightDate, stdz) {
+    // Converts user-entered date/time to true Julian date (UT).
+    if (enterUT) {
+        return dateToJD(y, mo, d, h, mn, s);
+    }
+    const { jdb, jde } = findDSTBounds(y, stdz, useDST);
+    let jd = dateToJD(y, mo, d, h, mn, s);
+    if (nightDate && h < 12) jd += 1.0;
+    jd = jd + zoneOffset(useDST, stdz, jd + stdz / 24.0, jdb, jde) / 24.0;
+    return jd;
+}
+
+// ============================================================
+// SECTION 7: Sun
+// ============================================================
+
+function lpsun(jd) {
+    // Low-precision sun position. Returns {ra (decimal hrs), dec (degrees)}.
+    const n = jd - J2000;
+    const L = 280.460 + 0.9856474 * n;
+    const g = (357.528 + 0.9856003 * n) / DEG_IN_RADIAN;
+    const lambda = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2.0 * g)) / DEG_IN_RADIAN;
+    const epsilon = (23.439 - 0.0000004 * n) / DEG_IN_RADIAN;
+    const x = Math.cos(lambda);
+    const y = Math.cos(epsilon) * Math.sin(lambda);
+    const z = Math.sin(epsilon) * Math.sin(lambda);
+    return {
+        ra:  atanCirc(x, y) * HRS_IN_RADIAN,
+        dec: Math.asin(z) * DEG_IN_RADIAN
+    };
+}
+
+function eclrot(jd, x, y, z) {
+    // Rotates ecliptic rectangular coords to equatorial (of date).
+    // Returns {x, y, z} with y and z rotated.
+    const T = (jd - J2000) / 36525.0;
+    const incl = (23.439291 + T * (-0.0130042 - 0.00000016 * T)) / DEG_IN_RADIAN;
+    const ypr = Math.cos(incl) * y - Math.sin(incl) * z;
+    const zpr = Math.sin(incl) * y + Math.cos(incl) * z;
+    return { x, y: ypr, z: zpr };
+}
+
+function accusun(jd, lst_hrs, geolat) {
+    // Accurate solar ephemeris (Meeus/1900 epoch).
+    // Returns {ra, dec, dist, topora, topodec, x, y, z}
+    // x,y,z are heliocentric equatorial coordinates of Earth.
+    const jdet = jd + etcorr(jd) / SEC_IN_DAY;
+    const T = (jdet - 2415020.0) / 36525.0;
+    const Tsq = T * T;
+    const Tcb = T * Tsq;
+
+    let L = 279.69668 + 36000.76892*T + 0.0003025*Tsq;
+    let M = 358.47583 + 35999.04975*T - 0.000150*Tsq - 0.0000033*Tcb;
+    const e = 0.01675104 - 0.0000418*T - 0.000000126*Tsq;
+
+    L = circulo(L);
+    M = circulo(M);
+
+    const A = circulo(153.23 + 22518.7541 * T) / DEG_IN_RADIAN;
+    const B = circulo(216.57 + 45037.5082 * T) / DEG_IN_RADIAN;
+    const C = circulo(312.69 + 32964.3577 * T) / DEG_IN_RADIAN;
+    const D = circulo(350.74 + 445267.1142*T - 0.00144*Tsq) / DEG_IN_RADIAN;
+    const E = circulo(231.19 + 20.20*T) / DEG_IN_RADIAN;
+    const H = circulo(353.40 + 65928.7155*T) / DEG_IN_RADIAN;
+
+    L = L + 0.00134*Math.cos(A) + 0.00154*Math.cos(B) + 0.00200*Math.cos(C)
+          + 0.00179*Math.sin(D) + 0.00178*Math.sin(E);
+
+    const Mrad = M / DEG_IN_RADIAN;
+    const Cent = (1.919460 - 0.004789*T - 0.000014*Tsq)*Math.sin(Mrad)
+               + (0.020094 - 0.000100*T)*Math.sin(2.0*Mrad)
+               + 0.000293*Math.sin(3.0*Mrad);
+    const sunlong = L + Cent;
+    const nu = M + Cent;
+    const nurad = nu / DEG_IN_RADIAN;
+
+    let R = (1.0000002 * (1 - e*e)) / (1.0 + e * Math.cos(nurad));
+    R = R + 0.00000543*Math.sin(A) + 0.00001575*Math.sin(B)
+          + 0.00001627*Math.sin(C) + 0.00003076*Math.cos(D)
+          + 0.00000927*Math.sin(H);
+
+    const slrad = sunlong / DEG_IN_RADIAN;
+    let sx = Math.cos(slrad);
+    let sy = Math.sin(slrad);
+    let sz = 0.0;
+    ({ x: sx, y: sy, z: sz } = eclrot(jdet, sx, sy, sz));
+
+    // Topocentric correction
+    const geo = geocent(lst_hrs, geolat, 0.0);
+    const xtop = sx - geo.x * EQUAT_RAD / ASTRO_UNIT;
+    const ytop = sy - geo.y * EQUAT_RAD / ASTRO_UNIT;
+    const ztop = sz - geo.z * EQUAT_RAD / ASTRO_UNIT;
+    const topodist = Math.sqrt(xtop*xtop + ytop*ytop + ztop*ztop);
+
+    const topora = atanCirc(xtop / topodist, ytop / topodist) * HRS_IN_RADIAN;
+    const topodec = Math.asin(ztop / topodist) * DEG_IN_RADIAN;
+    const ra  = atanCirc(sx, sy) * HRS_IN_RADIAN;
+    const dec = Math.asin(sz) * DEG_IN_RADIAN;
+
+    // Heliocentric earth position (negate and scale by R)
+    const ex = sx * R * -1.0;
+    const ey = sy * R * -1.0;
+    const ez = sz * R * -1.0;
+
+    return { ra, dec, dist: R, topora, topodec, x: ex, y: ey, z: ez };
+}
+
+function ztwilight(alt) {
+    // Sky brightness polynomial (alt in degrees, negative for below horizon).
+    const y = (-1.0 * alt - 9.0) / 9.0;
+    return ((2.0635175 * y + 1.246602) * y - 9.4084495) * y + 6.132725;
+}
+
+function jdSunAlt(alt, jdguess, lat, longit) {
+    // Returns JD at which sun is at altitude alt (Newton iteration).
+    const del = 0.002;
+    let sun = lpsun(jdguess);
+    let ha = lst(jdguess, longit) - sun.ra;
+    let alt2 = altit(sun.dec, ha, lat).alt;
+    jdguess += del;
+    sun = lpsun(jdguess);
+    let alt3 = altit(sun.dec, lst(jdguess, longit) - sun.ra, lat).alt;
+    let err = alt3 - alt;
+    let deriv = (alt3 - alt2) / del;
+    let i = 0;
+    while (Math.abs(err) > 0.1 && i < 10) {
+        jdguess -= err / deriv;
+        sun = lpsun(jdguess);
+        alt3 = altit(sun.dec, lst(jdguess, longit) - sun.ra, lat).alt;
+        err = alt3 - alt;
+        i++;
+    }
+    if (i >= 9) return -1000.0;
+    return jdguess;
+}
+
+// ============================================================
+// SECTION 8: Moon
+// ============================================================
+
+function lpmoon(jd, lat, sid) {
+    // Low-precision moon position with topocentric correction.
+    // Returns {ra (hrs), dec (degrees), dist (earth radii)}.
+    const T = (jd - J2000) / 36525.0;
+    let lambda = 218.32 + 481267.883 * T
+        + 6.29 * Math.sin((134.9 + 477198.85 * T) / DEG_IN_RADIAN)
+        - 1.27 * Math.sin((259.2 - 413335.38 * T) / DEG_IN_RADIAN)
+        + 0.66 * Math.sin((235.7 + 890534.23 * T) / DEG_IN_RADIAN)
+        + 0.21 * Math.sin((269.9 + 954397.70 * T) / DEG_IN_RADIAN)
+        - 0.19 * Math.sin((357.5 +  35999.05 * T) / DEG_IN_RADIAN)
+        - 0.11 * Math.sin((186.6 + 966404.05 * T) / DEG_IN_RADIAN);
+    lambda /= DEG_IN_RADIAN;
+    let beta = 5.13 * Math.sin((93.3 + 483202.03 * T) / DEG_IN_RADIAN)
+        + 0.28 * Math.sin((228.2 + 960400.87 * T) / DEG_IN_RADIAN)
+        - 0.28 * Math.sin((318.3 +   6003.18 * T) / DEG_IN_RADIAN)
+        - 0.17 * Math.sin((217.6 - 407332.20 * T) / DEG_IN_RADIAN);
+    beta /= DEG_IN_RADIAN;
+    let pie = 0.9508
+        + 0.0518 * Math.cos((134.9 + 477198.85 * T) / DEG_IN_RADIAN)
+        + 0.0095 * Math.cos((259.2 - 413335.38 * T) / DEG_IN_RADIAN)
+        + 0.0078 * Math.cos((235.7 + 890534.23 * T) / DEG_IN_RADIAN)
+        + 0.0028 * Math.cos((269.9 + 954397.70 * T) / DEG_IN_RADIAN);
+    pie /= DEG_IN_RADIAN;
+    const distance = 1.0 / Math.sin(pie);
+
+    let l = Math.cos(beta) * Math.cos(lambda);
+    let m = 0.9175 * Math.cos(beta) * Math.sin(lambda) - 0.3978 * Math.sin(beta);
+    let n = 0.3978 * Math.cos(beta) * Math.sin(lambda) + 0.9175 * Math.sin(beta);
+
+    let x = l * distance;
+    let y = m * distance;
+    let z = n * distance;
+
+    const rad_lat = lat / DEG_IN_RADIAN;
+    const rad_lst = sid / HRS_IN_RADIAN;
+    x -= Math.cos(rad_lat) * Math.cos(rad_lst);
+    y -= Math.cos(rad_lat) * Math.sin(rad_lst);
+    z -= Math.sin(rad_lat);
+
+    const topo_dist = Math.sqrt(x*x + y*y + z*z);
+    l = x / topo_dist; m = y / topo_dist; n = z / topo_dist;
+
+    return {
+        ra:   atanCirc(l, m) * HRS_IN_RADIAN,
+        dec:  Math.asin(n) * DEG_IN_RADIAN,
+        dist: topo_dist
+    };
+}
+
+function accumoon(jd, geolat, lst_hrs, elevsea) {
+    // Accurate lunar ephemeris (Meeus). Returns {geora, geodec, geodist, topora, topodec, topodist}.
+    const jdet = jd + etcorr(jd) / SEC_IN_DAY;
+    const T = (jdet - 2415020.0) / 36525.0;  // 1900 epoch
+    const Tsq = T * T;
+    const Tcb = Tsq * T;
+
+    let Lpr = circulo(270.434164 + 481267.8831*T - 0.001133*Tsq + 0.0000019*Tcb);
+    let M   = circulo(358.475833 +  35999.0498*T - 0.000150*Tsq - 0.0000033*Tcb);
+    let Mpr = circulo(296.104608 + 477198.8491*T + 0.009192*Tsq + 0.0000144*Tcb);
+    let D   = circulo(350.737486 + 445267.1142*T - 0.001436*Tsq + 0.0000019*Tcb);
+    let F   = circulo( 11.250889 + 483202.0251*T - 0.003211*Tsq - 0.0000003*Tcb);
+    let Om  = circulo(259.183275 -   1934.1420*T + 0.002078*Tsq + 0.0000022*Tcb);
+
+    let sinx = Math.sin((51.2 + 20.2 * T) / DEG_IN_RADIAN);
+    Lpr += 0.000233 * sinx;
+    M   -= 0.001778 * sinx;
+    Mpr += 0.000817 * sinx;
+    D   += 0.002011 * sinx;
+
+    sinx = 0.003964 * Math.sin((346.560 + 132.870*T - 0.0091731*Tsq) / DEG_IN_RADIAN);
+    Lpr += sinx; Mpr += sinx; D += sinx; F += sinx;
+
+    sinx = Math.sin(Om / DEG_IN_RADIAN);
+    Lpr += 0.001964 * sinx;
+    Mpr += 0.002541 * sinx;
+    D   += 0.001964 * sinx;
+    F   -= 0.024691 * sinx;
+    F   -= 0.004328 * Math.sin((Om + 275.05 - 2.30*T) / DEG_IN_RADIAN);
+
+    const e = 1.0 - 0.002495*T - 0.00000752*Tsq;
+
+    M   /= DEG_IN_RADIAN;
+    Mpr /= DEG_IN_RADIAN;
+    D   /= DEG_IN_RADIAN;
+    F   /= DEG_IN_RADIAN;
+
+    let lambda = Lpr
+        + 6.288750 * Math.sin(Mpr)
+        + 1.274018 * Math.sin(2*D - Mpr)
+        + 0.658309 * Math.sin(2*D)
+        + 0.213616 * Math.sin(2*Mpr)
+        - e * 0.185596 * Math.sin(M)
+        - 0.114336 * Math.sin(2*F)
+        + 0.058793 * Math.sin(2*D - 2*Mpr)
+        + e * 0.057212 * Math.sin(2*D - M - Mpr)
+        + 0.053320 * Math.sin(2*D + Mpr)
+        + e * 0.045874 * Math.sin(2*D - M)
+        + e * 0.041024 * Math.sin(Mpr - M)
+        - 0.034718 * Math.sin(D)
+        - e * 0.030465 * Math.sin(M + Mpr)
+        + 0.015326 * Math.sin(2*D - 2*F)
+        - 0.012528 * Math.sin(2*F + Mpr)
+        - 0.010980 * Math.sin(2*F - Mpr)
+        + 0.010674 * Math.sin(4*D - Mpr)
+        + 0.010034 * Math.sin(3*Mpr)
+        + 0.008548 * Math.sin(4*D - 2*Mpr)
+        - e * 0.007910 * Math.sin(M - Mpr + 2*D)
+        - e * 0.006783 * Math.sin(2*D + M)
+        + 0.005162 * Math.sin(Mpr - D)
+        + e * 0.005000 * Math.sin(M + D)
+        + e * 0.004049 * Math.sin(Mpr - M + 2*D)
+        + 0.003996 * Math.sin(2*Mpr + 2*D)
+        + 0.003862 * Math.sin(4*D)
+        + 0.003665 * Math.sin(2*D - 3*Mpr)
+        + e * 0.002695 * Math.sin(2*Mpr - M)
+        + 0.002602 * Math.sin(Mpr - 2*F - 2*D)
+        + e * 0.002396 * Math.sin(2*D - M - 2*Mpr)
+        - 0.002349 * Math.sin(Mpr + D)
+        + e*e * 0.002249 * Math.sin(2*D - 2*M)
+        - e * 0.002125 * Math.sin(2*Mpr + M)
+        - e*e * 0.002079 * Math.sin(2*M)
+        + e*e * 0.002059 * Math.sin(2*D - Mpr - 2*M)
+        - 0.001773 * Math.sin(Mpr + 2*D - 2*F)
+        - 0.001595 * Math.sin(2*F + 2*D)
+        + e * 0.001220 * Math.sin(4*D - M - Mpr)
+        - 0.001110 * Math.sin(2*Mpr + 2*F)
+        + 0.000892 * Math.sin(Mpr - 3*D)
+        - e * 0.000811 * Math.sin(M + Mpr + 2*D)
+        + e * 0.000761 * Math.sin(4*D - M - 2*Mpr)
+        + e*e * 0.000717 * Math.sin(Mpr - 2*M)
+        + e*e * 0.000704 * Math.sin(Mpr - 2*M - 2*D)
+        + e * 0.000693 * Math.sin(M - 2*Mpr + 2*D)
+        + e * 0.000598 * Math.sin(2*D - M - 2*F)
+        + 0.000550 * Math.sin(Mpr + 4*D)
+        + 0.000538 * Math.sin(4*Mpr)
+        + e * 0.000521 * Math.sin(4*D - M)
+        + 0.000486 * Math.sin(2*Mpr - D);
+
+    let B = 5.128189 * Math.sin(F)
+        + 0.280606 * Math.sin(Mpr + F)
+        + 0.277693 * Math.sin(Mpr - F)
+        + 0.173238 * Math.sin(2*D - F)
+        + 0.055413 * Math.sin(2*D + F - Mpr)
+        + 0.046272 * Math.sin(2*D - F - Mpr)
+        + 0.032573 * Math.sin(2*D + F)
+        + 0.017198 * Math.sin(2*Mpr + F)
+        + 0.009267 * Math.sin(2*D + Mpr - F)
+        + 0.008823 * Math.sin(2*Mpr - F)
+        + e * 0.008247 * Math.sin(2*D - M - F)
+        + 0.004323 * Math.sin(2*D - F - 2*Mpr)
+        + 0.004200 * Math.sin(2*D + F + Mpr)
+        + e * 0.003372 * Math.sin(F - M - 2*D)
+        + 0.002472 * Math.sin(2*D + F - M - Mpr)
+        + e * 0.002222 * Math.sin(2*D + F - M)
+        + e * 0.002072 * Math.sin(2*D - F - M - Mpr)
+        + e * 0.001877 * Math.sin(F - M + Mpr)
+        + 0.001828 * Math.sin(4*D - F - Mpr)
+        - e * 0.001803 * Math.sin(F + M)
+        - 0.001750 * Math.sin(3*F)
+        + e * 0.001570 * Math.sin(Mpr - M - F)
+        - 0.001487 * Math.sin(F + D)
+        - e * 0.001481 * Math.sin(F + M + Mpr)
+        + e * 0.001417 * Math.sin(F - M - Mpr)
+        + e * 0.001350 * Math.sin(F - M)
+        + 0.001330 * Math.sin(F - D)
+        + 0.001106 * Math.sin(F + 3*Mpr)
+        + 0.001020 * Math.sin(4*D - F)
+        + 0.000833 * Math.sin(F + 4*D - Mpr)
+        + 0.000781 * Math.sin(Mpr - 3*F)
+        + 0.000670 * Math.sin(F + 4*D - 2*Mpr)
+        + 0.000606 * Math.sin(2*D - 3*F)
+        + 0.000597 * Math.sin(2*D + 2*Mpr - F)
+        + e * 0.000492 * Math.sin(2*D + Mpr - M - F)
+        + 0.000450 * Math.sin(2*Mpr - F - 2*D)
+        + 0.000439 * Math.sin(3*Mpr - F)
+        + 0.000423 * Math.sin(F + 2*D + 2*Mpr)
+        + 0.000422 * Math.sin(2*D - F - 3*Mpr)
+        - e * 0.000367 * Math.sin(M + F + 2*D - Mpr)
+        - e * 0.000353 * Math.sin(M + F + 2*D)
+        + 0.000331 * Math.sin(F + 4*D)
+        + e * 0.000317 * Math.sin(2*D + F - M + Mpr)
+        + e*e * 0.000306 * Math.sin(2*D - 2*M - F)
+        - 0.000283 * Math.sin(Mpr + 3*F);
+
+    const om1 = 0.0004664 * Math.cos(Om / DEG_IN_RADIAN);
+    const om2 = 0.0000754 * Math.cos((Om + 275.05 - 2.30*T) / DEG_IN_RADIAN);
+    let beta = B * (1.0 - om1 - om2);
+
+    const pie = 0.950724
+        + 0.051818 * Math.cos(Mpr)
+        + 0.009531 * Math.cos(2*D - Mpr)
+        + 0.007843 * Math.cos(2*D)
+        + 0.002824 * Math.cos(2*Mpr)
+        + 0.000857 * Math.cos(2*D + Mpr)
+        + e * 0.000533 * Math.cos(2*D - M)
+        + e * 0.000401 * Math.cos(2*D - M - Mpr)
+        + e * 0.000320 * Math.cos(Mpr - M)
+        - 0.000271 * Math.cos(D)
+        - e * 0.000264 * Math.cos(M + Mpr)
+        - 0.000198 * Math.cos(2*F - Mpr)
+        + 0.000173 * Math.cos(3*Mpr)
+        + 0.000167 * Math.cos(4*D - Mpr)
+        - e * 0.000111 * Math.cos(M)
+        + 0.000103 * Math.cos(4*D - 2*Mpr)
+        - 0.000084 * Math.cos(2*Mpr - 2*D)
+        - e * 0.000083 * Math.cos(2*D + M)
+        + 0.000079 * Math.cos(2*D + 2*Mpr)
+        + 0.000072 * Math.cos(4*D)
+        + e * 0.000064 * Math.cos(2*D - M + Mpr)
+        - e * 0.000063 * Math.cos(2*D + M - Mpr)
+        + e * 0.000041 * Math.cos(M + D)
+        + e * 0.000035 * Math.cos(2*Mpr - M)
+        - 0.000033 * Math.cos(3*Mpr - 2*D)
+        - 0.000030 * Math.cos(Mpr + D)
+        - 0.000029 * Math.cos(2*F - 2*D)
+        - e * 0.000029 * Math.cos(2*Mpr + M)
+        + e*e * 0.000026 * Math.cos(2*D - 2*M)
+        - 0.000023 * Math.cos(2*F - 2*D + Mpr)
+        + e * 0.000019 * Math.cos(4*D - M - Mpr);
+
+    beta /= DEG_IN_RADIAN;
+    lambda /= DEG_IN_RADIAN;
+
+    let l = Math.cos(lambda) * Math.cos(beta);
+    let m = Math.sin(lambda) * Math.cos(beta);
+    let n = Math.sin(beta);
+    ({ x: l, y: m, z: n } = eclrot(jdet, l, m, n));
+
+    const dist = 1.0 / Math.sin(pie / DEG_IN_RADIAN);
+    const gx = l * dist;
+    const gy = m * dist;
+    const gz = n * dist;
+
+    const geora  = atanCirc(l, m) * HRS_IN_RADIAN;
+    const geodec = Math.asin(n) * DEG_IN_RADIAN;
+    const geodist = dist;
+
+    // Topocentric correction
+    const geo = geocent(lst_hrs, geolat, elevsea);
+    const tx = gx - geo.x;
+    const ty = gy - geo.y;
+    const tz = gz - geo.z;
+    const topodist = Math.sqrt(tx*tx + ty*ty + tz*tz);
+
+    const topora  = atanCirc(tx / topodist, ty / topodist) * HRS_IN_RADIAN;
+    const topodec = Math.asin(tz / topodist) * DEG_IN_RADIAN;
+
+    return { geora, geodec, geodist, topora, topodec, topodist };
+}
+
+function flmoon(n, nph) {
+    // Returns JD of phase nph (0=new, 1=1st, 2=full, 3=last) of lunation n.
+    const lun = n + nph / 4.0;
+    const T = lun / 1236.85;
+    let jd = 2415020.75933 + 29.53058868 * lun
+           + 0.0001178 * T*T
+           - 0.000000155 * T*T*T
+           + 0.00033 * Math.sin((166.56 + 132.87*T - 0.009173*T*T) / DEG_IN_RADIAN);
+    const M   = (359.2242 + 29.10535608*lun - 0.0000333*T*T - 0.00000347*T*T*T) / DEG_IN_RADIAN;
+    const Mpr = (306.0253 + 385.81691806*lun + 0.0107306*T*T + 0.00001236*T*T*T) / DEG_IN_RADIAN;
+    const F   = (21.2964 + 390.67050646*lun - 0.0016528*T*T - 0.00000239*T*T*T) / DEG_IN_RADIAN;
+
+    let cor;
+    if (nph === 0 || nph === 2) {
+        cor = (0.1734 - 0.000393*T) * Math.sin(M)
+            + 0.0021 * Math.sin(2*M)
+            - 0.4068 * Math.sin(Mpr)
+            + 0.0161 * Math.sin(2*Mpr)
+            - 0.0004 * Math.sin(3*Mpr)
+            + 0.0104 * Math.sin(2*F)
+            - 0.0051 * Math.sin(M + Mpr)
+            - 0.0074 * Math.sin(M - Mpr)
+            + 0.0004 * Math.sin(2*F + M)
+            - 0.0004 * Math.sin(2*F - M)
+            - 0.0006 * Math.sin(2*F + Mpr)
+            + 0.0010 * Math.sin(2*F - Mpr)
+            + 0.0005 * Math.sin(M + 2*Mpr);
+    } else {
+        cor = (0.1721 - 0.0004*T) * Math.sin(M)
+            + 0.0021 * Math.sin(2*M)
+            - 0.6280 * Math.sin(Mpr)
+            + 0.0089 * Math.sin(2*Mpr)
+            - 0.0004 * Math.sin(3*Mpr)
+            + 0.0079 * Math.sin(2*F)
+            - 0.0119 * Math.sin(M + Mpr)
+            - 0.0047 * Math.sin(M - Mpr)
+            + 0.0003 * Math.sin(2*F + M)
+            - 0.0004 * Math.sin(2*F - M)
+            - 0.0006 * Math.sin(2*F + Mpr)
+            + 0.0021 * Math.sin(2*F - Mpr)
+            + 0.0003 * Math.sin(M + 2*Mpr)
+            + 0.0004 * Math.sin(M - 2*Mpr)
+            - 0.0003 * Math.sin(2*M + Mpr);
+        if (nph === 1) cor += 0.0028 - 0.0004*Math.cos(M) + 0.0003*Math.cos(Mpr);
+        if (nph === 3) cor -= 0.0028 - 0.0004*Math.cos(M) + 0.0003*Math.cos(Mpr);
+    }
+    return jd + cor;
+}
+
+function lunAge(jd) {
+    // Returns {age (days since last new moon), nlun (lunation number)}.
+    let nlast = Math.trunc((jd - 2415020.5) / 29.5307) - 1;
+    let lastnewjd = flmoon(nlast, 0);
+    nlast++;
+    let newjd = flmoon(nlast, 0);
+    let kount = 0;
+    while (newjd < jd && kount < 40) {
+        lastnewjd = newjd;
+        nlast++;
+        newjd = flmoon(nlast, 0);
+        kount++;
+    }
+    if (kount > 35) return { age: -10.0, nlun: 0 };
+    return { age: jd - lastnewjd, nlun: nlast - 1 };
+}
+
+function moonPhaseText(jd) {
+    // Returns verbal description of moon phase.
+    let nlast = Math.trunc((jd - 2415020.5) / 29.5307) - 1;
+    let lastnewjd = flmoon(nlast, 0);
+    nlast++;
+    let newjd = flmoon(nlast, 0);
+    let kount = 0;
+    while (newjd < jd && kount < 40) {
+        lastnewjd = newjd;
+        nlast++;
+        newjd = flmoon(nlast, 0);
+        kount++;
+    }
+    if (kount > 35) return "phase unknown";
+    const x = jd - lastnewjd;
+    nlast--;
+    const noctiles = Math.trunc(x / 3.69134);
+    if (noctiles === 0) return x.toFixed(1) + " days since new moon";
+    else if (noctiles <= 2) {
+        const fqjd = flmoon(nlast, 1);
+        const dx = jd - fqjd;
+        if (dx < 0) return (-dx).toFixed(1) + " days before first quarter";
+        else return dx.toFixed(1) + " days since first quarter";
+    } else if (noctiles <= 4) {
+        const fljd = flmoon(nlast, 2);
+        const dx = jd - fljd;
+        if (dx < 0) return (-dx).toFixed(1) + " days until full moon";
+        else return dx.toFixed(1) + " days after full moon";
+    } else if (noctiles <= 6) {
+        const lqjd = flmoon(nlast, 3);
+        const dx = jd - lqjd;
+        if (dx < 0) return (-dx).toFixed(1) + " days before last quarter";
+        else return dx.toFixed(1) + " days after last quarter";
+    } else {
+        return (newjd - jd).toFixed(1) + " days before new moon";
+    }
+}
+
+function lunskybright(alpha, rho, kzen, altmoon, alt, moondist) {
+    // Lunar sky brightness in V mag/sq-arcsec (Krisciunas & Schaefer 1991).
+    const rho_rad = rho / DEG_IN_RADIAN;
+    alpha = 180.0 - alpha;
+    const Zmoon = (90.0 - altmoon) / DEG_IN_RADIAN;
+    const Z = (90.0 - alt) / DEG_IN_RADIAN;
+    moondist /= 60.27;
+    let istar = -0.4 * (3.84 + 0.026 * Math.abs(alpha) + 4.0e-9 * Math.pow(alpha, 4.0));
+    istar = Math.pow(10.0, istar) / (moondist * moondist);
+    if (Math.abs(alpha) < 7.0) istar *= (1.35 - 0.05 * Math.abs(istar));
+    let fofrho = 229087.0 * (1.06 + Math.cos(rho_rad) * Math.cos(rho_rad));
+    if (Math.abs(rho) > 10.0) fofrho += Math.pow(10.0, 6.15 - rho / 40.0);
+    else if (Math.abs(rho) > 0.25) fofrho += 6.2e7 / (rho * rho);
+    else fofrho += 9.9e8;
+    let Xzm = Math.sqrt(1.0 - 0.96 * Math.sin(Zmoon) * Math.sin(Zmoon));
+    Xzm = (Xzm !== 0.0) ? 1.0 / Xzm : 10000.0;
+    let Xo = Math.sqrt(1.0 - 0.96 * Math.sin(Z) * Math.sin(Z));
+    Xo = (Xo !== 0.0) ? 1.0 / Xo : 10000.0;
+    const Bmoon = fofrho * istar * Math.pow(10.0, -0.4 * kzen * Xzm)
+                * (1.0 - Math.pow(10.0, -0.4 * kzen * Xo));
+    if (Bmoon > 0.001) return 22.50 - 1.08574 * Math.log(Bmoon / 34.08);
+    return 99.0;
+}
+
+function jdMoonAlt(alt, jdguess, lat, longit, elevsea) {
+    // Returns JD at which moon is at altitude alt (Newton iteration).
+    const del = 0.002;
+    let sid = lst(jdguess, longit);
+    let moon = accumoon(jdguess, lat, sid, elevsea);
+    let ha = lst(jdguess, longit) - moon.topora;
+    let alt2 = altit(moon.topodec, ha, lat).alt;
+    jdguess += del;
+    sid = lst(jdguess, longit);
+    moon = accumoon(jdguess, lat, sid, elevsea);
+    let alt3 = altit(moon.topodec, sid - moon.topora, lat).alt;
+    let err = alt3 - alt;
+    let deriv = (alt3 - alt2) / del;
+    let i = 0;
+    while (Math.abs(err) > 0.1 && i < 10) {
+        jdguess -= err / deriv;
+        sid = lst(jdguess, longit);
+        moon = accumoon(jdguess, lat, sid, elevsea);
+        alt3 = altit(moon.topodec, sid - moon.topora, lat).alt;
+        err = alt3 - alt;
+        i++;
+    }
+    if (i >= 9) return -1000.0;
+    return jdguess;
+}
+
+// ============================================================
+// SECTION 9: Coordinate transforms
+// ============================================================
+
+function precrot(rorig, dorig, origEpoch, finalEpoch) {
+    // Precesses RA (decimal hrs) and dec (degrees) between epochs (IAU1976).
+    // Returns {ra, dec}.
+    const ti = (origEpoch - 2000.0) / 100.0;
+    const tf = (finalEpoch - 2000.0 - 100.0 * ti) / 100.0;
+
+    const zeta  = ((2306.2181 + 1.39656*ti + 0.000139*ti*ti)*tf +
+                   (0.30188 - 0.000344*ti)*tf*tf + 0.017998*tf*tf*tf) / ARCSEC_IN_RADIAN;
+    const z     = (zeta * ARCSEC_IN_RADIAN + (0.79280 + 0.000410*ti)*tf*tf +
+                   0.000205*tf*tf*tf) / ARCSEC_IN_RADIAN;
+    const theta = ((2004.3109 - 0.8533*ti - 0.000217*ti*ti)*tf -
+                   (0.42665 + 0.000217*ti)*tf*tf - 0.041833*tf*tf*tf) / ARCSEC_IN_RADIAN;
+
+    const cosz = Math.cos(z), sinz = Math.sin(z);
+    const coszeta = Math.cos(zeta), sinzeta = Math.sin(zeta);
+    const costheta = Math.cos(theta), sintheta = Math.sin(theta);
+
+    const p11 =  coszeta*cosz*costheta - sinzeta*sinz;
+    const p12 = -sinzeta*cosz*costheta - coszeta*sinz;
+    const p13 = -cosz*sintheta;
+    const p21 =  coszeta*sinz*costheta + sinzeta*cosz;
+    const p22 = -sinzeta*sinz*costheta + coszeta*cosz;
+    const p23 = -sinz*sintheta;
+    const p31 =  coszeta*sintheta;
+    const p32 = -sinzeta*sintheta;
+    const p33 =  costheta;
+
+    const rrad = rorig / HRS_IN_RADIAN;
+    const drad = dorig / DEG_IN_RADIAN;
+    const ox = Math.cos(drad) * Math.cos(rrad);
+    const oy = Math.cos(drad) * Math.sin(rrad);
+    const oz = Math.sin(drad);
+
+    const fx = p11*ox + p12*oy + p13*oz;
+    const fy = p21*ox + p22*oy + p23*oz;
+    const fz = p31*ox + p32*oy + p33*oz;
+
+    return xyzCel(fx, fy, fz);
+}
+
+function galact(ra, dec, epoch) {
+    // Returns {glong, glat} (degrees) in galactic coordinates.
+    const p11 = -0.066988739415, p12 = -0.872755765853, p13 = -0.483538914631;
+    const p21 =  0.492728466047, p22 = -0.450346958025, p23 =  0.744584633299;
+    const p31 = -0.867600811168, p32 = -0.188374601707, p33 =  0.460199784759;
+
+    const prec = precrot(ra, dec, epoch, 1950.0);
+    const r1950 = prec.ra  / HRS_IN_RADIAN;
+    const d1950 = prec.dec / DEG_IN_RADIAN;
+
+    const x0 = Math.cos(r1950) * Math.cos(d1950);
+    const y0 = Math.sin(r1950) * Math.cos(d1950);
+    const z0 = Math.sin(d1950);
+
+    const x1 = p11*x0 + p12*y0 + p13*z0;
+    const y1 = p21*x0 + p22*y0 + p23*z0;
+    const z1 = p31*x0 + p32*y0 + p33*z0;
+
+    return {
+        glong: atanCirc(x1, y1) * DEG_IN_RADIAN,
+        glat:  Math.asin(z1) * DEG_IN_RADIAN
+    };
+}
+
+function eclipt(ra, dec, epoch, jd) {
+    // Returns {curep, eclong, eclat} - ecliptic coordinates at current epoch.
+    const T = (jd - J2000) / 36525.0;
+    const curep = 2000.0 + (jd - J2000) / 365.25;
+    const incl = (23.439291 + T * (-0.0130042 - 0.00000016 * T)) / DEG_IN_RADIAN;
+
+    const prec = precrot(ra, dec, epoch, curep);
+    const racur  = prec.ra  / HRS_IN_RADIAN;
+    const decur  = prec.dec / DEG_IN_RADIAN;
+
+    const x0 = Math.cos(decur) * Math.cos(racur);
+    const y0 = Math.cos(decur) * Math.sin(racur);
+    const z0 = Math.sin(decur);
+
+    const x1 = x0;
+    const y1 = Math.cos(incl)*y0 + Math.sin(incl)*z0;
+    const z1 = -Math.sin(incl)*y0 + Math.cos(incl)*z0;
+
+    return {
+        curep,
+        eclong: atanCirc(x1, y1) * DEG_IN_RADIAN,
+        eclat:  Math.asin(z1) * DEG_IN_RADIAN
+    };
+}
+
+// ============================================================
+// SECTION 10: Planets, barycentric corrections
+// ============================================================
+
+let jd_el = 0.0;
+const el = new Array(10).fill(null).map(() => ({
+    name: '', incl: 0, Omega: 0, omega: 0, a: 0,
+    daily: 0, ecc: 0, L_0: 0, mass: 0
+}));
+
+function compEl(jd) {
+    // Computes and loads mean orbital elements for planets 1-9.
+    jd_el = jd;
+    const d = jd - 2415020.0;
+    const T = d / 36525.0;
+    const Tsq = T * T;
+    const Tcb = Tsq * T;
+
+    el[1].name = 'Mercury';
+    el[1].incl  = 7.002880 + 1.8608e-3*T - 1.83e-5*Tsq;
+    el[1].Omega = 47.14594 + 1.185208*T + 1.74e-4*Tsq;
+    el[1].omega = 75.899697 + 1.55549*T + 2.95e-4*Tsq;
+    el[1].a     = 0.3870986;
+    el[1].daily = 4.0923388;
+    el[1].ecc   = 0.20561421 + 0.00002046*T;
+    el[1].L_0   = 178.179078 + 4.0923770233*d + 0.0000226*Math.pow(3.6525*T, 2.0);
+
+    el[2].name  = 'Venus';
+    el[2].incl  = 3.39363 + 1.00583e-3*T - 9.722e-7*Tsq;
+    el[2].Omega = 75.7796472 + 0.89985*T + 4.1e-4*Tsq;
+    el[2].omega = 130.16383 + 1.4080*T + 9.764e-4*Tsq;
+    el[2].a     = 0.723325;
+    el[2].daily = 1.60213049;
+    el[2].ecc   = 0.00682069 - 0.00004774*T;
+    el[2].L_0   = 342.767053 + 1.6021687039*36525*T + 0.000023212*Math.pow(3.6525*T, 2.0);
+
+    el[3].name  = 'Earth';
+    el[3].ecc   = 0.01675104 - 0.00004180*T + 0.000000126*Tsq;
+    el[3].incl  = 0.0;
+    el[3].Omega = 0.0;
+    el[3].omega = 101.22083 + 0.0000470684*d + 0.000453*Tsq + 0.000003*Tcb;
+    el[3].a     = 1.0000007;
+    el[3].daily = 0.985599;
+    el[3].L_0   = 358.47583 + 0.9856002670*d - 0.000150*Tsq - 0.000003*Tcb + el[3].omega;
+
+    el[4].name  = 'Mars';
+    el[4].incl  = 1.85033 - 6.75e-4*T - 1.833e-5*Tsq;
+    el[4].Omega = 48.786442 + 0.770992*T + 1.39e-6*Tsq;
+    el[4].omega = 334.218203 + 1.840758*T + 1.299e-4*Tsq;
+    el[4].a     = 1.5236915;
+    el[4].daily = 0.5240329502 + 1.285e-9*T;
+    el[4].ecc   = 0.09331290 - 0.000092064*T - 0.000000077*Tsq;
+    el[4].L_0   = 293.747628 + 0.5240711638*d + 0.000023287*Math.pow(3.6525*T, 2.0);
+
+    // Jupiter (with perturbations)
+    const ups = 0.2*T + 0.1;
+    const P = (237.47555 + 3034.9061*T) / DEG_IN_RADIAN;
+    const Q = (265.91650 + 1222.1139*T) / DEG_IN_RADIAN;
+    const S = (243.51721 + 428.4677*T)  / DEG_IN_RADIAN;
+    const V = 5*Q - 2*P;
+    const W = 2*P - 6*Q + 3*S;
+    const zeta = Q - P;
+    const sinQ = Math.sin(Q), cosQ = Math.cos(Q);
+    const sinV = Math.sin(V), cosV = Math.cos(V);
+    const sinZeta = Math.sin(zeta), cosZeta = Math.cos(zeta);
+    const sin2Zeta = Math.sin(2*zeta), cos2Zeta = Math.cos(2*zeta);
+
+    el[5].name  = 'Jupiter';
+    el[5].incl  = 1.308736 - 0.0056961*T + 0.0000039*Tsq;
+    el[5].Omega = 99.443414 + 1.0105300*T + 0.0003522*Tsq - 0.00000851*Tcb;
+    el[5].omega = 12.720972 + 1.6099617*T + 1.05627e-3*Tsq - 3.43e-6*Tcb;
+    el[5].a     = 5.202561;
+    el[5].daily = 0.08312941782;
+    el[5].ecc   = 0.04833475 + 1.64180e-4*T - 4.676e-7*Tsq - 1.7e-9*Tcb;
+    el[5].L_0   = 238.049257 + 3036.301986*T + 0.0003347*Tsq - 1.65e-6*Tcb;
+    el[5].L_0  += (0.331364 - 0.010281*ups - 0.004692*ups*ups)*sinV
+               + (0.003228 - 0.064436*ups + 0.002075*ups*ups)*cosV
+               - (0.003083 + 0.000275*ups - 0.000489*ups*ups)*Math.sin(2*V)
+               + 0.002472*Math.sin(W) + 0.013619*sinZeta + 0.018472*sin2Zeta
+               + 0.006717*Math.sin(3*zeta)
+               + (0.007275 - 0.001253*ups)*sinZeta*sinQ
+               + 0.006417*sin2Zeta*sinQ
+               - (0.033839 + 0.001253*ups)*cosZeta*sinQ
+               - (0.035681 + 0.001208*ups)*sinZeta*sinQ;
+    el[5].ecc  += 1e-7*((3606 + 130*ups - 43*ups*ups)*sinV
+               + (1289 - 580*ups)*cosV - 6764*sinZeta*sinQ
+               - 1110*sin2Zeta*sinQ + (1284 + 116*ups)*cosZeta*sinQ
+               + (1460 + 130*ups)*sinZeta*cosQ + 6074*cosZeta*cosQ);
+    el[5].omega += (0.007192 - 0.003147*ups)*sinV
+                + (0.000197*ups*ups - 0.00675*ups - 0.020428)*cosV
+                + 0.034036*cosZeta*sinQ + 0.037761*sinZeta*cosQ;
+    el[5].a    += 1.0e-6*(205*cosZeta - 263*cosV + 693*cos2Zeta + 312*Math.sin(3*zeta)
+               + 147*Math.cos(4*zeta) + 299*sinZeta*sinQ
+               + 181*cos2Zeta*sinQ + 181*cos2Zeta*sinQ
+               + 204*sin2Zeta*cosQ + 111*Math.sin(3*zeta)*cosQ
+               - 337*cosZeta*cosQ - 111*cos2Zeta*cosQ);
+
+    // Saturn
+    el[6].name  = 'Saturn';
+    el[6].incl  = 2.492519 - 0.00034550*T - 7.28e-7*Tsq;
+    el[6].Omega = 112.790414 + 0.8731951*T - 0.00015218*Tsq - 5.31e-6*Tcb;
+    el[6].omega = 91.098214 + 1.9584158*T + 8.2636e-4*Tsq;
+    el[6].a     = 9.554747;
+    el[6].daily = 0.0334978749897;
+    el[6].ecc   = 0.05589232 - 3.4550e-4*T - 7.28e-7*Tsq;
+    el[6].L_0   = 266.564377 + 1223.509884*T + 0.0003245*Tsq - 5.8e-6*Tcb
+        + (0.018150*ups - 0.814181 + 0.016714*ups*ups)*sinV
+        + (0.160906*ups - 0.010497 - 0.004100*ups*ups)*cosV
+        + 0.007581*Math.sin(2*V) - 0.007986*Math.sin(W)
+        - 0.148811*sinZeta - 0.040786*sin2Zeta
+        - 0.015208*Math.sin(3*zeta) - 0.006339*Math.sin(4*zeta)
+        - 0.006244*sinQ
+        + (0.008931 + 0.002728*ups)*sinZeta*sinQ - 0.016500*sin2Zeta*sinQ
+        - 0.005775*Math.sin(3*zeta)*sinQ
+        + (0.081344 + 0.003206*ups)*cosZeta*sinQ + 0.015019*cos2Zeta*sinQ
+        + (0.085581 + 0.002494*ups)*sinZeta*cosQ
+        + (0.025328 - 0.003117*ups)*cosZeta*cosQ + 0.014394*cos2Zeta*cosQ;
+    el[6].ecc  += 1.0e-7*((2458*ups - 7927)*sinV + (13381 + 1226*ups)*cosV
+               + 12415*sinQ + 26599*cosZeta*sinQ - 4687*cos2Zeta*sinQ
+               - 12696*sinZeta*cosQ - 4200*sin2Zeta*cosQ
+               + (2211 - 286*ups)*sinZeta*Math.sin(2*Q)
+               - 2208*sin2Zeta*Math.sin(2*Q) - 2780*cosZeta*Math.sin(2*Q)
+               + 2022*cos2Zeta*Math.sin(2*Q) - 2842*sinZeta*Math.cos(2*Q)
+               - 1594*cosZeta*Math.cos(2*Q) + 2162*cos2Zeta*Math.cos(2*Q));
+    el[6].omega += (0.077108 + 0.007186*ups - 0.001533*ups*ups)*sinV
+                + (0.045803 - 0.014766*ups - 0.000536*ups*ups)*cosV
+                - 0.075825*sinZeta*sinQ - 0.024839*sin2Zeta*sinQ
+                - 0.072582*cosQ - 0.150383*cosZeta*cosQ + 0.026897*cos2Zeta*cosQ;
+    el[6].a    += 1.0e-6*(2933*cosV + 33629*cosZeta - 3081*cos2Zeta
+               - 1423*Math.cos(3*zeta) + 1098*sinQ - 2812*sinZeta*sinQ
+               + 2138*cosZeta*sinQ + 2206*sinZeta*cosQ
+               - 1590*sin2Zeta*cosQ + 2885*cosZeta*cosQ + 2172*cos2Zeta*cosQ);
+
+    // Uranus (with Jupiter-Saturn perturbations)
+    const G  = (83.76922 + 218.4901*T) / DEG_IN_RADIAN;
+    const Hu = 2*G - S;
+    el[7].name  = 'Uranus';
+    el[7].incl  = 0.772464 + 0.0006253*T + 0.0000395*Tsq;
+    el[7].Omega = 73.477111 + 0.4986678*T + 0.0013117*Tsq;
+    el[7].omega = 171.548692 + 1.4844328*T + 2.37e-4*Tsq - 6.1e-7*Tcb;
+    el[7].a     = 19.21814;
+    el[7].daily = 1.1769022484e-2;
+    el[7].ecc   = 0.0463444 - 2.658e-5*T;
+    el[7].L_0   = 244.197470 + 429.863546*T + 0.000316*Tsq - 6e-7*Tcb;
+    el[7].L_0  += (0.864319 - 0.001583*ups)*Math.sin(Hu)
+               + (0.082222 - 0.006833*ups)*Math.cos(Hu) + 0.036017*Math.sin(2*Hu);
+    el[7].omega += 0.120303*Math.sin(Hu) + (0.019472 - 0.000947*ups)*Math.cos(Hu)
+                + 0.006197*Math.sin(2*Hu);
+    el[7].ecc   += 1.0e-7*(20981*Math.cos(Hu) - 3349*Math.sin(Hu) + 1311*Math.cos(2*Hu));
+    el[7].a     -= 0.003825*Math.cos(Hu);
+
+    // Neptune
+    el[8].name  = 'Neptune';
+    el[8].incl  = 1.779242 - 9.5436e-3*T - 9.1e-6*Tsq;
+    el[8].Omega = 130.681389 + 1.0989350*T + 2.4987e-4*Tsq - 4.718e-6*Tcb;
+    el[8].omega = 46.727364 + 1.4245744*T + 3.9082e-3*Tsq - 6.05e-7*Tcb;
+    el[8].a     = 30.10957;
+    el[8].daily = 6.020148227e-3;
+    el[8].ecc   = 0.00899704 + 6.33e-6*T;
+    el[8].L_0   = 84.457994 + 219.885914*T + 0.0003205*Tsq - 6e-7*Tcb;
+    el[8].L_0  -= (0.589833 - 0.001089*ups)*Math.sin(Hu)
+               + (0.056094 - 0.004658*ups)*Math.cos(Hu) + 0.024286*Math.sin(2*Hu);
+    el[8].omega += 0.024039*Math.sin(Hu) - 0.025303*Math.cos(Hu);
+    el[8].ecc   += 1.0e-7*(4389*Math.sin(Hu) + 1129*Math.sin(2*Hu)
+                + 4262*Math.cos(Hu) + 1089*Math.cos(2*Hu));
+    el[8].a     += 8.189e-3*Math.cos(Hu);
+
+    // Pluto (osculating elements ~1992 Sep 15)
+    const dp = jd - 2448880.5;
+    el[9].name  = 'Pluto';
+    el[9].incl  = 17.1426;
+    el[9].Omega = 110.180;
+    el[9].omega = 223.782;
+    el[9].a     = 39.7465;
+    el[9].daily = 0.00393329;
+    el[9].ecc   = 0.253834;
+    el[9].L_0   = 228.1027 + 0.00393329 * dp;
+
+    // Masses (fraction of solar mass, IAU 1976)
+    el[1].mass = 1.660137e-7;
+    el[2].mass = 2.447840e-6;
+    el[3].mass = 3.040433e-6;
+    el[4].mass = 3.227149e-7;
+    el[5].mass = 9.547907e-4;
+    el[6].mass = 2.858776e-4;
+    el[7].mass = 4.355401e-5;
+    el[8].mass = 5.177591e-5;
+    el[9].mass = 7.69e-9;
+}
+
+function planetXYZ(p, jd) {
+    // Returns {x, y, z} ecliptic position of planet p at JD jd (AU).
+    const ii = el[p].incl / DEG_IN_RADIAN;
+    const e  = el[p].ecc;
+    const LL = (el[p].daily * (jd - jd_el) + el[p].L_0) / DEG_IN_RADIAN;
+    const Om = el[p].Omega / DEG_IN_RADIAN;
+    const om = el[p].omega / DEG_IN_RADIAN;
+    const M = LL - om;
+    const omnotil = om - Om;
+    const nu = M + (2.0*e - 0.25*Math.pow(e, 3.0))*Math.sin(M)
+             + 1.25*e*e*Math.sin(2*M) + 1.08333333*Math.pow(e, 3.0)*Math.sin(3*M);
+    const r = el[p].a * (1.0 - e*e) / (1.0 + e*Math.cos(nu));
+    const x = r*(Math.cos(nu+omnotil)*Math.cos(Om) - Math.sin(nu+omnotil)*Math.cos(ii)*Math.sin(Om));
+    const y = r*(Math.cos(nu+omnotil)*Math.sin(Om) + Math.sin(nu+omnotil)*Math.cos(ii)*Math.cos(Om));
+    const z = r*Math.sin(nu+omnotil)*Math.sin(ii);
+    return { x, y, z };
+}
+
+function planetVel(p, jd) {
+    // Returns {vx, vy, vz} velocity of planet p (AU/day, ecliptic).
+    const dt = 0.1 / el[p].daily;
+    const p1 = planetXYZ(p, jd - dt);
+    const p2 = planetXYZ(p, jd + dt);
+    return {
+        vx: 0.5*(p2.x - p1.x)/dt,
+        vy: 0.5*(p2.y - p1.y)/dt,
+        vz: 0.5*(p2.z - p1.z)/dt
+    };
+}
+
+function earthView(xarr, yarr, zarr, i) {
+    // Returns {ra, dec} of planet i as seen from Earth (index 3).
+    return xyzCel(xarr[i] - xarr[3], yarr[i] - yarr[3], zarr[i] - zarr[3]);
+}
+
+function pposns(jd, lat, sid) {
+    // Computes planet positions. Returns array[0..8] with {ra,dec} for each planet
+    // (index 0=Mercury, 1=Venus, 2=null for Earth, 3=Mars, 4=Jupiter, etc.)
+    compEl(jd);
+    const sun = accusun(jd, 0.0, 0.0);
+    const xarr = new Array(10).fill(0);
+    const yarr = new Array(10).fill(0);
+    const zarr = new Array(10).fill(0);
+    xarr[3] = sun.x; yarr[3] = sun.y; zarr[3] = sun.z;
+
+    const result = [];
+    for (let i = 1; i <= 9; i++) {
+        if (i === 3) { result.push(null); continue; }
+        const pos = planetXYZ(i, jd);
+        xarr[i] = pos.x; yarr[i] = pos.y; zarr[i] = pos.z;
+        const eq = eclrot(jd, xarr[i], yarr[i], zarr[i]);
+        xarr[i] = eq.x; yarr[i] = eq.y; zarr[i] = eq.z;
+        result.push(earthView(xarr, yarr, zarr, i));
+    }
+    return result;
+}
+
+function barycor(jd, x, y, z, xdot, ydot, zdot) {
+    // Corrects heliocentric position/velocity to solar system barycenter.
+    // NOTE: faithfully ports the z-accumulation bug from original C code
+    // (line: zc += el[p].mass * zc; should be zp but isn't).
+    compEl(jd);
+
+    let xc = 0, yc = 0, zc = 0, xvc = 0, yvc = 0, zvc = 0;
+    for (let p = 1; p <= 9; p++) {
+        const pos = planetXYZ(p, jd);
+        xc += el[p].mass * pos.x;
+        yc += el[p].mass * pos.y;
+        zc += el[p].mass * zc;  // BUG: original C has zc not zp; ported faithfully
+        const vel = planetVel(p, jd);
+        xvc += el[p].mass * vel.vx;
+        yvc += el[p].mass * vel.vy;
+        zvc += el[p].mass * zvc; // BUG: original C has zvc not vel.vz; ported faithfully
+    }
+
+    xc /= SS_MASS; yc /= SS_MASS; zc /= SS_MASS;
+    ({ x: xc, y: yc, z: zc } = eclrot(jd, xc, yc, zc));
+
+    xvc = xvc * KMS_AUDAY / SS_MASS;
+    yvc = yvc * KMS_AUDAY / SS_MASS;
+    zvc = zvc * KMS_AUDAY / SS_MASS;
+    ({ x: xvc, y: yvc, z: zvc } = eclrot(jd, xvc, yvc, zvc));
+
+    return {
+        x: x - xc, y: y - yc, z: z - zc,
+        xdot: xdot - xvc, ydot: ydot - yvc, zdot: zdot - zvc
+    };
+}
+
+function helcor(jd, ra, dec, ha, lat, elevsea) {
+    // Returns {tcor (seconds), vcor (km/s)} heliocentric/barycentric velocity corrections.
+    const a = 499.0047837;  // light travel time for 1 AU in seconds
+    dec = dec / DEG_IN_RADIAN;
+    ra  = ra  / HRS_IN_RADIAN;
+    ha  = ha  / HRS_IN_RADIAN;
+
+    const xobj = Math.cos(ra) * Math.cos(dec);
+    const yobj = Math.sin(ra) * Math.cos(dec);
+    const zobj = Math.sin(dec);
+
+    const jd1 = jd - EARTH_DIFF;
+    const jd2 = jd + EARTH_DIFF;
+
+    const s1 = accusun(jd1, 0.0, 0.0);
+    const s2 = accusun(jd2, 0.0, 0.0);
+    const s  = accusun(jd,  0.0, 0.0);
+
+    let { x, y, z } = s;
+    const xdot = KMS_AUDAY * (s2.x - s1.x) / (2.0 * EARTH_DIFF);
+    const ydot = KMS_AUDAY * (s2.y - s1.y) / (2.0 * EARTH_DIFF);
+    const zdot = KMS_AUDAY * (s2.z - s1.z) / (2.0 * EARTH_DIFF);
+
+    const bc = barycor(jd, x, y, z, xdot, ydot, zdot);
+
+    const tcor = a * (bc.x*xobj + bc.y*yobj + bc.z*zobj);
+    let vcor = bc.xdot*xobj + bc.ydot*yobj + bc.zdot*zobj;
+
+    // Diurnal rotation correction (geocentric)
+    const geo = geocent(0.0, lat, elevsea);
+    vcor -= 0.4651011 * geo.x * Math.sin(ha) * Math.cos(dec);
+
+    return { tcor, vcor };
+}
+
+// ============================================================
+// SECTION 11: Test suite
+// ============================================================
+
+function _checkInternal(label, got, expected, tol) {
+    const diff = Math.abs(got - expected);
+    const ok = diff <= tol;
+    print((ok ? 'PASS' : 'FAIL') + '  ' + label +
+          '  got=' + got.toFixed(6) + '  exp=' + expected.toFixed(6) +
+          '  diff=' + diff.toFixed(6) + '  tol=' + tol);
+    return ok;
+}
+
+function runTests() {
+    print('');
+    print('=== skycalc-math.js validation against reference_output.txt ===');
+    print('');
+    print('Site: AAT Siding Spring, Date: 2026-Mar-15 12:00 UT');
+    print('Object: RA 12h00m00s, Dec -45deg, Epoch 2000.0');
+    print('');
+
+    // AAT site parameters (west-positive hours for longitude; stdz also west-positive)
+    const lat     = -31.277039;   // degrees N (negative = south)
+    const longit  = -9.937739;    // decimal hours west (negative = east of Greenwich)
+    const elevsea = 1149.0;       // meters
+    const stdz    = -10.0;        // hours west (negative = east)
+    const useDST  = -2;           // Australian
+
+    const ra    = 12.0;           // decimal hours
+    const dec   = -45.0;          // degrees
+    const epoch = 2000.0;
+
+    // --- Test 1: Julian date ---
+    const jd = dateToJD(2026, 3, 15, 12, 0, 0);
+    _checkInternal('dateToJD(2026-03-15 12:00 UT)', jd, 2461115.0, 0.001);
+
+    // --- Test 2: LMST ---
+    const lmst = lst(jd, longit);
+    // Reference: 9h 28m 41.3s = 9 + 28/60 + 41.3/3600 = 9.478139 hrs
+    _checkInternal('LMST at AAT (hrs)', lmst, 9.478139, 0.001);
+
+    // --- Test 3: Delta T ---
+    const dt = etcorr(jd);
+    _checkInternal('etcorr Delta-T (sec)', dt, 85.5, 0.5);
+
+    // --- Test 4: Current epoch ---
+    const curep = 2000.0 + (jd - J2000) / 365.25;
+    _checkInternal('current epoch', curep, 2026.20, 0.01);
+
+    // --- Test 5: Precession ---
+    const prec = precrot(ra, dec, epoch, curep);
+    // Reference: RA 12h 01m 20.7s = 12 + 1/60 + 20.7/3600 = 12.022417 hrs
+    _checkInternal('precessed RA (hrs)', prec.ra, 12.022417, 0.001);
+    // Reference: Dec -45deg 08' 45" = -(45 + 8/60 + 45/3600) = -45.145833 deg
+    _checkInternal('precessed Dec (deg)', prec.dec, -45.145833, 0.01);
+
+    // --- Test 6: Hour angle, altitude ---
+    const ha = adjTime(lmst - prec.ra);
+    // Reference: HA -2h 32m 39s = -(2 + 32/60 + 39/3600) = -2.544167 hrs
+    _checkInternal('hour angle (hrs)', ha, -2.544167, 0.01);
+    const altaz = altit(prec.dec, ha, lat);
+    _checkInternal('altitude (deg)', altaz.alt, 57.35, 0.05);
+    _checkInternal('azimuth (deg)', altaz.az, 126.11, 0.1);
+    const sz = secantZ(altaz.alt);
+    _checkInternal('sec(z)', sz, 1.188, 0.005);
+
+    // --- Test 7: Parallactic angle ---
+    const pa = parang(ha, prec.dec, lat);
+    _checkInternal('parallactic angle (deg)', pa, -78.2, 0.5);
+
+    // --- Test 8: Galactic coordinates ---
+    const gal = galact(ra, dec, epoch);
+    _checkInternal('galactic l (deg)', gal.glong, 293.46, 0.05);
+    _checkInternal('galactic b (deg)', gal.glat,   16.92, 0.05);
+
+    // --- Test 9: Ecliptic coordinates ---
+    const ecl = eclipt(ra, dec, epoch, jd);
+    _checkInternal('ecliptic long (deg)', ecl.eclong, 202.05, 0.1);
+    _checkInternal('ecliptic lat (deg)',  ecl.eclat,  -40.45, 0.1);
+
+    // --- Test 10: Barycentric corrections ---
+    const hc = helcor(jd, prec.ra, prec.dec, ha, lat, elevsea);
+    _checkInternal('helcor tcor (sec)',  hc.tcor, 337.7, 1.0);
+    _checkInternal('helcor vcor (km/s)', hc.vcor,  10.89, 0.05);
+
+    // --- Test 11: BJD ---
+    const bjd = jd + hc.tcor / SEC_IN_DAY;
+    _checkInternal('BJD', bjd, 2461115.003909, 0.000010);
+
+    // --- Test 12: DST active check (March = southern summer = DST at AAT) ---
+    const { jdb, jde } = findDSTBounds(2026, stdz, useDST);
+    const zone = zoneOffset(useDST, stdz, jd + stdz/24.0, jdb, jde);
+    // DST active (AEDT) = UTC+11 = stdz-1 = -10-1 = -11
+    _checkInternal('DST zone 2026-Mar-15 (should be -11)', zone, -11.0, 0.001);
+
+    // --- Test 13: Moon phase ---
+    const la = lunAge(jd);
+    // Reference: "3.6 days before new moon" = ~25.9 days old (29.5307 - 3.6)
+    _checkInternal('moon age (days)', la.age, 29.5307 - 3.6, 0.5);
+
+    // --- Test 14: Sun low-precision position ---
+    const sun = lpsun(jd);
+    // Reference: Sun RA 23h 41.3m = 23 + 41.3/60 = 23.68833 hrs
+    _checkInternal('sun RA lpsun (hrs)', sun.ra, 23.6883, 0.05);
+
+    // --- Test 15: Jupiter position (from pposns) ---
+    const planets = pposns(jd, lat, lmst);
+    // result[4] = planet index 5 = Jupiter
+    // Reference: RA 7h 05.7m = 7 + 5.7/60 = 7.095, Dec +22deg 56' = 22.933
+    const jup = planets[4];
+    _checkInternal('Jupiter RA (hrs)', jup.ra,  7.095, 0.1);
+    _checkInternal('Jupiter Dec (deg)', jup.dec, 22.933, 0.5);
+
+    // --- Test 16: J2000.0 sanity check ---
+    const jd2000 = dateToJD(2000, 1, 1, 12, 0, 0);
+    _checkInternal('J2000.0 JD', jd2000, 2451545.0, 0.001);
+
+    print('');
+    print('=== Done ===');
+}
+
+// runTests();  // Call from skycalc-tests.js, not here
