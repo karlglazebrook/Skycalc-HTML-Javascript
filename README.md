@@ -112,3 +112,9 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 MIT — see [LICENSE](LICENSE).
 
 The original `skycalc.c` was distributed freely for academic and educational use by John Thorstensen.
+
+---
+
+## Development
+
+This port was written collaboratively by **Karl Glazebrook** and **Claude Sonnet** (Anthropic's AI assistant). Claude performed the C→JS translation, wrote the test suite, designed the three-layer architecture, and built the HTML/CSS/JS UI. Karl provided domain guidance, validated the results, and directed the overall design.
