@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.7 — 2026-03-16
+
+### Repository tidy-up
+
+- Moved all test-related files into a `tests/` subdirectory:
+  - `skycalc-tests.js`, `TESTS.md`, `test_input.txt`
+  - `c_input_s1.txt` … `c_input_s4.txt` (scripted C binary inputs)
+  - `c_output_s1.txt` … `c_output_s4.txt` (captured C binary outputs — ground truth)
+- Updated `run-tests.sh` to invoke `tests/skycalc-tests.js`; all 153 tests still pass
+- Updated `README.md` files table to reflect new paths
+
+---
+
 ## v0.6 — 2026-03-16
 
 ### Test suite expanded (99 → 153 tests)

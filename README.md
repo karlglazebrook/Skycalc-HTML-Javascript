@@ -98,13 +98,16 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 |------|-------------|
 | `skycalc.html` | The complete single-file web app |
 | `skycalc-math.js` | Math engine (source for the embedded block in the HTML) |
-| `skycalc-tests.js` | 153-test validation suite |
-| `run-tests.sh` | Test runner (requires macOS JavaScriptCore) |
 | `skycalc.c` | Original C source by John Thorstensen |
-| `test_input.txt` | Scripted input used to drive the C binary |
-| `TESTS.md` | Test structure and accuracy tolerances |
+| `run-tests.sh` | Test runner (requires macOS JavaScriptCore) |
 | `CHANGES.md` | Version history |
 | `PLAN.md` | Implementation plan and architecture notes |
+| **`tests/`** | **Test suite and reference data** |
+| `tests/skycalc-tests.js` | 153-test validation suite |
+| `tests/TESTS.md` | Test structure and accuracy tolerances |
+| `tests/c_input_s1.txt` … `c_input_s4.txt` | Scripted inputs used to drive the C binary for each scenario |
+| `tests/c_output_s1.txt` … `c_output_s4.txt` | Captured C binary output — ground truth for all hardcoded values |
+| `tests/test_input.txt` | Legacy scripted input (scenario 1) |
 
 ---
 
