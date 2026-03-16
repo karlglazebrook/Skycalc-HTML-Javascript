@@ -1,0 +1,132 @@
+
+Astronomical calculator program, by John Thorstensen.
+
+*SELECT SITE* - Enter single-character code:
+   n .. NEW SITE, prompts for all parameters.
+   x .. exit without change (current: Kitt Peak)
+   k .. Kitt Peak [MDM Obs.]
+   e .. European Southern Obs, La Silla
+   v .. VLT European Southern Obs, Paranal
+   a .. Anglo-Australian Telelescope, Siding Spring
+   h .. Mt. Hopkins, AZ (MMT, FLWO)
+   p .. Palomar Observatory
+   t .. Cerro Tololo 
+   r .. Roque de los Muchachos, La Palma, Canary Is.
+   b .. Baltimore, MD
+   d .. Dominion Astrophysical Obs., Victoria, BC
+   o .. McDonald Observatory, Mt. Locke, Texas
+   m .. Mauna Kea, Hawaii
+   l .. Lick Observatory
+   s .. SDSS - Apache Point Observatory New Mexico
+Your answer --> You have selected Anglo-Australian Tel., Siding Spring
+(This can be changed later using the 's' [site] command.
+
+
+DATE AND TIME SET AUTOMATICALLY USING SYSTEM CLOCK ... to
+Mon, 2026 Mar 16, time  20 27 22.0 local time
+(NOTE: time does NOT automatically update; 'T' reads clock again.)
+
+COORDINATES SET TO ZENITH:   6 56 40.2, -31 10 14, epoch 1950.0
+
+READY TO COMPUTE.  Use simple commands to set the date, time, RA
+dec, and so on; then use other commands to compute and display
+observability information.
+
+NEW or RUSTY USERS: type 'f' (and return) for FAST guided tour.
+Dates and times entered are now UT.
+TIME IS CHANGED to 2026 03 16, 20 27 22 UNIVERSAL time.
+
+Current INPUT parameter values:
+
+      DATE: 2026 Mar 15
+      TIME: 12 00 00.0
+NIGHT_DATE:  OFF   -- date is taken literally.
+  UT_INPUT:  ON    -- input times taken to be UT.
+   USE_DST:  -2    -- Daylight savings used part of year.
+
+            RA:  12 00 00.00
+           DEC: -45 00 00.0
+   INPUT EPOCH:    2000.00
+PROPER MOTIONS:  OFF
+
+SITE: Anglo-Australian Tel., Siding Spring
+      E.longit. =  149 04.0, latit. = -31 16.6 (degrees)
+      Standard zone =  10 hrs  East
+      Elevation above horizon =  670 m, True elevation = 1149 m
+
+W Long (hms): -9 56 15.9, lat (dms):-31 16 37, std time zone -10 hr W
+
+   UT Date and time: Sun, 2026 Mar 15, time  12 00 00.0
+local Date and time: Sun, 2026 Mar 15, time  23 00 00.0  ADT
+DST assumed in effect.
+
+Julian date: 2461115.000000   LMST:   9 28 41.3
+
+Std epoch--> RA: 12 00 00.0, dec:-45 00 00, ep 2000.00
+Current  --> RA: 12 01 20.7, dec:-45 08 45, ep 2026.20
+HA:  -2 32 39; sec.z =    1.188
+altitude  57.35, azimuth 126.11, parallactic angle -78.2  [101.8]
+
+The sun is down; there is no twilight.
+3.6 days before new moon.  The moon is down.
+Barycentric corrections: add  337.7 sec, 10.89 km/sec to observed values.
+Barycentric Julian date = 2461115.003909
+
+Type command, 'f' for fast tour, '?' for a menu:Galactic: l = 293.46, b = 16.92
+Ecliptic (equinox 2026.20): long = 202.05, lat = -40.45
+Delta t = TDT - UT =  85.5 seconds
+JD 2461115.000000 (UT) -->  2461115.000989 (TDT)
+(Value is an extrapolated guess ... only computable after the fact.)
+
+(eXtra goodies doesn't loop.)
+Back in main commands, 'Q' quits, '?' menu, 'f' fast tour.
+
+W Long (hms): -9 56 15.9, lat (dms):-31 16 37, std time zone -10 hr W
+
+   UT Date and time: Sun, 2026 Mar 15, time  12 00 00.0
+local Date and time: Sun, 2026 Mar 15, time  23 00 00.0  ADT
+DST assumed in effect.
+
+Julian date: 2461115.000000   LMST:   9 28 41.3
+
+Planetary positions (epoch of date), accuracy about 0.1 deg:
+
+             RA       dec       HA       sec.z     alt   az
+
+Sun    :  23 41.3    -2 01     9 47      -1.44   -44.2  229.6
+Moon   :  20 56.8   -19 10   -11 28      -1.59   -39.0  170.3
+
+Mercury:  22 42.7    -5 41    10 46      -1.32   -49.0  208.8
+Venus  :   0 43.0     3 30     8 46      -1.68   -36.6  248.8
+Mars   :  22 48.4    -8 46    10 40      -1.40   -45.6  208.8
+Jupiter:   7 05.7    22 56     2 23       2.29    25.9  323.3
+Saturn :   0 16.1    -0 35     9 13      -1.58   -39.2  239.3
+Uranus :   3 44.0    19 35     5 45      -8.32    -6.9  288.8
+Neptune:   0 07.7    -0 35     9 21      -1.53   -40.7  237.5
+Pluto  :  20 31.8   -22 57   -11 03      -1.78   -34.1  164.2 <-(least accurate)
+Type command, or ? for menu:*** Almanac for the currently specified date ***, but CAUTION!!
+The 'night date' option is off, so be especially careful
+this is the correct night.  See 'g' and 'n'...
+Almanac for Anglo-Australian Tel., Siding Spring:
+long.  -9 56 16 (h.m.s) W, lat. -31 16.6 (d.m), elev.  1149 m
+Australian Daylight Savings Time used before 2 AM 
+2026 Apr 5 and after 2 AM 2026 Oct 4; standard zone = -10 hrs W
+
+For the night of: Sun, 2026 Mar 15 ---> Mon, 2026 Mar 16
+Local midnight = 2026 Mar 15, 13 hr UT, or JD 2461115.042
+Local Mean Sidereal Time at midnight =  10 28 51.1
+
+Sunset (  670 m horizon):   19 26 ADT; Sunrise:    7 00 ADT
+Evening twilight:   20 43 ADT;  LMST at evening twilight:    7 11
+Morning twilight:    5 43 ADT;  LMST at morning twilight:   16 13
+12-degr twilight:  20 14 ADT -->   6 11 ADT; night center:    1 13 ADT
+
+Moonset :   17 14 ADT   Moonrise:    3 45 ADT   
+Moon at civil midnight: illuminated fraction 0.135
+3.5 days before new moon, RA and dec:  20 59 45, -18 59.4
+
+The sun is down for 11.6 hr;  9.0 hr from eve->morn 18 deg twilight.
+ 7.0 dark hours after end of twilight and before moonrise.
+
+Type command, 'f' for fast tour, or '?' for menu:Suggestions or comments --> john.thorstensen@dartmouth.edu
+Goodbye.

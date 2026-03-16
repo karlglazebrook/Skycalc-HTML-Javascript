@@ -1,0 +1,76 @@
+
+Astronomical calculator program, by John Thorstensen.
+
+*SELECT SITE* - Enter single-character code:
+   n .. NEW SITE, prompts for all parameters.
+   x .. exit without change (current: Kitt Peak)
+   k .. Kitt Peak [MDM Obs.]
+   e .. European Southern Obs, La Silla
+   v .. VLT European Southern Obs, Paranal
+   a .. Anglo-Australian Telelescope, Siding Spring
+   h .. Mt. Hopkins, AZ (MMT, FLWO)
+   p .. Palomar Observatory
+   t .. Cerro Tololo 
+   r .. Roque de los Muchachos, La Palma, Canary Is.
+   b .. Baltimore, MD
+   d .. Dominion Astrophysical Obs., Victoria, BC
+   o .. McDonald Observatory, Mt. Locke, Texas
+   m .. Mauna Kea, Hawaii
+   l .. Lick Observatory
+   s .. SDSS - Apache Point Observatory New Mexico
+Your answer --> You have selected Mauna Kea, Hawaii
+(This can be changed later using the 's' [site] command.
+
+
+DATE AND TIME SET AUTOMATICALLY USING SYSTEM CLOCK ... to
+Mon, 2026 Mar 16, time  20 27 22.0 local time
+(NOTE: time does NOT automatically update; 'T' reads clock again.)
+
+COORDINATES SET TO ZENITH:   7 40 25.1,  20 00 38, epoch 1950.0
+
+READY TO COMPUTE.  Use simple commands to set the date, time, RA
+dec, and so on; then use other commands to compute and display
+observability information.
+
+NEW or RUSTY USERS: type 'f' (and return) for FAST guided tour.
+Dates and times entered are now UT.
+TIME IS CHANGED to 2026 03 16, 20 27 22 UNIVERSAL time.
+
+Current INPUT parameter values:
+
+      DATE: 2099 Nov 10
+      TIME: 14 00 00.0
+NIGHT_DATE:  OFF   -- date is taken literally.
+  UT_INPUT:  ON    -- input times taken to be UT.
+   USE_DST:   0    -- Standard time in use all year.
+
+            RA:   0 42 44.00
+           DEC:  41 16 09.0
+   INPUT EPOCH:    2000.00
+PROPER MOTIONS:  OFF
+
+SITE: Mauna Kea, Hawaii
+      E.longit. = -155 28.3, latit. =  19 49.6 (degrees)
+      Standard zone =  10 hrs  West
+      Elevation above horizon = 4215 m, True elevation = 4215 m
+
+W Long (hms): 10 21 53.2, lat (dms): 19 49 36, std time zone  10 hr W
+
+   UT Date and time: Tue, 2099 Nov 10, time  14 00 00.0
+local Date and time: Tue, 2099 Nov 10, time   4 00 00.0  HST
+Julian date: 2488018.083333   LMST:   6 58 21.1
+
+Std epoch--> RA:  0 42 44.0, dec: 41 16 09, ep 2000.00
+Current  --> RA:  0 48 14.5, dec: 41 48 51, ep 2099.86
+HA:   6 10 07; sec.z =    5.123 -- Large airmass!
+altitude  11.26, azimuth 310.61, parallactic angle 73.4  [-106.6]
+
+The sun is down; there is no twilight.
+1.9 days before new moon.  The moon is down.
+Barycentric corrections: add  393.0 sec, -8.93 km/sec to observed values.
+Barycentric Julian date = 2488018.087882
+
+Type command, 'f' for fast tour, '?' for a menu:Galactic: l = 121.17, b = -21.57
+Ecliptic (equinox 2099.86): long = 29.24, lat = 33.36
+Suggestions or comments --> john.thorstensen@dartmouth.edu
+Goodbye.

@@ -1,0 +1,78 @@
+
+Astronomical calculator program, by John Thorstensen.
+
+*SELECT SITE* - Enter single-character code:
+   n .. NEW SITE, prompts for all parameters.
+   x .. exit without change (current: Kitt Peak)
+   k .. Kitt Peak [MDM Obs.]
+   e .. European Southern Obs, La Silla
+   v .. VLT European Southern Obs, Paranal
+   a .. Anglo-Australian Telelescope, Siding Spring
+   h .. Mt. Hopkins, AZ (MMT, FLWO)
+   p .. Palomar Observatory
+   t .. Cerro Tololo 
+   r .. Roque de los Muchachos, La Palma, Canary Is.
+   b .. Baltimore, MD
+   d .. Dominion Astrophysical Obs., Victoria, BC
+   o .. McDonald Observatory, Mt. Locke, Texas
+   m .. Mauna Kea, Hawaii
+   l .. Lick Observatory
+   s .. SDSS - Apache Point Observatory New Mexico
+Your answer --> You have selected Kitt Peak [MDM Obs.]
+(This can be changed later using the 's' [site] command.
+
+
+DATE AND TIME SET AUTOMATICALLY USING SYSTEM CLOCK ... to
+Mon, 2026 Mar 16, time  20 27 22.0 local time
+(NOTE: time does NOT automatically update; 'T' reads clock again.)
+
+COORDINATES SET TO ZENITH:   7 34 55.9,  32 07 41, epoch 1950.0
+
+READY TO COMPUTE.  Use simple commands to set the date, time, RA
+dec, and so on; then use other commands to compute and display
+observability information.
+
+NEW or RUSTY USERS: type 'f' (and return) for FAST guided tour.
+Dates and times entered are now UT.
+TIME IS CHANGED to 2026 03 16, 20 27 22 UNIVERSAL time.
+
+Current INPUT parameter values:
+
+      DATE: 2050 Jun 21
+      TIME: 12 00 00.0
+NIGHT_DATE:  OFF   -- date is taken literally.
+  UT_INPUT:  ON    -- input times taken to be UT.
+   USE_DST:   0    -- Standard time in use all year.
+
+            RA:  17 45 40.00
+           DEC: -29 00 28.0
+   INPUT EPOCH:    2000.00
+PROPER MOTIONS:  OFF
+
+SITE: Kitt Peak [MDM Obs.]
+      E.longit. = -111 37.0, latit. =  31 57.2 (degrees)
+      Standard zone =   7 hrs  West
+      Elevation above horizon =  700 m, True elevation = 1925 m
+
+W Long (hms):  7 26 28.0, lat (dms): 31 57 12, std time zone   7 hr W
+
+   UT Date and time: Tue, 2050 Jun 21, time  12 00 00.0
+local Date and time: Tue, 2050 Jun 21, time   5 00 00.0  MST
+Julian date: 2469979.000000   LMST:  22 33 04.2
+
+Std epoch--> RA: 17 45 40.0, dec:-29 00 28, ep 2000.00
+Current  --> RA: 17 48 52.6, dec:-29 01 24, ep 2050.47
+HA:   4 44 12; sec.z =  -63.249 -- BELOW HORIZON.
+altitude  -0.91, azimuth 235.80, parallactic angle 53.4  [-126.6]
+
+In twilight, sun alt -4.7, az  58.5 ; Sun at   6 01 29.1,  23 25 51
+Clear zenith twilight (blue) approx 10.7  mag over dark night sky.
+2.1 days since new moon.  The moon is down.
+Ecliptic latitude -5.6; watch for low-flying minor planets.
+Barycentric corrections: add  505.4 sec, -1.64 km/sec to observed values.
+Barycentric Julian date = 2469979.005850
+
+Type command, 'f' for fast tour, '?' for a menu:Galactic: l = 359.94, b = -0.05
+Ecliptic (equinox 2050.47): long = 267.56, lat = -5.61
+Suggestions or comments --> john.thorstensen@dartmouth.edu
+Goodbye.

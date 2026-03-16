@@ -1,0 +1,83 @@
+
+Astronomical calculator program, by John Thorstensen.
+
+*SELECT SITE* - Enter single-character code:
+   n .. NEW SITE, prompts for all parameters.
+   x .. exit without change (current: Kitt Peak)
+   k .. Kitt Peak [MDM Obs.]
+   e .. European Southern Obs, La Silla
+   v .. VLT European Southern Obs, Paranal
+   a .. Anglo-Australian Telelescope, Siding Spring
+   h .. Mt. Hopkins, AZ (MMT, FLWO)
+   p .. Palomar Observatory
+   t .. Cerro Tololo 
+   r .. Roque de los Muchachos, La Palma, Canary Is.
+   b .. Baltimore, MD
+   d .. Dominion Astrophysical Obs., Victoria, BC
+   o .. McDonald Observatory, Mt. Locke, Texas
+   m .. Mauna Kea, Hawaii
+   l .. Lick Observatory
+   s .. SDSS - Apache Point Observatory New Mexico
+Your answer --> 
+
+** Will use daylght time, Chilean date conventions. 
+
+You have selected VLT, ESO Cerro Paranal
+(This can be changed later using the 's' [site] command.
+
+
+DATE AND TIME SET AUTOMATICALLY USING SYSTEM CLOCK ... to
+Mon, 2026 Mar 16, time  20 27 22.0 local time
+(NOTE: time does NOT automatically update; 'T' reads clock again.)
+
+COORDINATES SET TO ZENITH:   6 20 49.2, -24 37 31, epoch 1950.0
+
+READY TO COMPUTE.  Use simple commands to set the date, time, RA
+dec, and so on; then use other commands to compute and display
+observability information.
+
+NEW or RUSTY USERS: type 'f' (and return) for FAST guided tour.
+Dates and times entered are now UT.
+TIME IS CHANGED to 2026 03 16, 20 27 22 UNIVERSAL time.
+
+Current INPUT parameter values:
+
+      DATE: 2075 Dec 15
+      TIME: 12 00 00.0
+NIGHT_DATE:  OFF   -- date is taken literally.
+  UT_INPUT:  ON    -- input times taken to be UT.
+   USE_DST:  -1    -- Daylight savings used part of year.
+
+            RA:   5 34 32.00
+           DEC:  22 00 52.0
+   INPUT EPOCH:    2000.00
+PROPER MOTIONS:  OFF
+
+SITE: VLT, ESO Cerro Paranal
+      E.longit. = -70 25.0, latit. = -24 40.0 (degrees)
+      Standard zone =   4 hrs  West
+      Elevation above horizon = 2635 m, True elevation = 2635 m
+
+W Long (hms):  4 41 39.8, lat (dms):-24 40 00, std time zone   4 hr W
+
+   UT Date and time: Sun, 2075 Dec 15, time  12 00 00.0
+local Date and time: Sun, 2075 Dec 15, time   9 00 00.0  CDT
+DST assumed in effect.
+
+Julian date: 2479287.000000   LMST:  12 55 29.8
+
+Std epoch--> RA:  5 34 32.0, dec: 22 00 52, ep 2000.00
+Current  --> RA:  5 39 06.5, dec: 22 03 26, ep 2075.95
+HA:   7 16 23; sec.z =   -2.313 -- BELOW HORIZON.
+altitude -25.61, azimuth 283.78, parallactic angle 107.8  [-72.2]
+
+The sun is up, alt 27.5, az 104.6; Sun at  17 32 16.1, -23 16 32
+0.9 days since first quarter.  The moon is down.
+Ecliptic latitude -1.3; watch for low-flying minor planets.
+Barycentric corrections: add  492.3 sec,  0.26 km/sec to observed values.
+Barycentric Julian date = 2479287.005698
+
+Type command, 'f' for fast tour, '?' for a menu:Galactic: l = 184.56, b = -5.78
+Ecliptic (equinox 2075.95): long = 85.16, lat = -1.28
+Suggestions or comments --> john.thorstensen@dartmouth.edu
+Goodbye.
