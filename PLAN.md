@@ -4,11 +4,13 @@
 
 Convert `skycalc.c` (6,629-line astronomical calculator by John Thorstensen) into a single self-contained HTML file web application.
 
+> **Status: complete (v0.8.5).** Every phase below is done. The app ships as `skycalc.html` — live at <https://karlglazebrook.github.io/Skycalc-HTML-Javascript/> — and is validated by a 180-test suite against the compiled C binary (see `tests/TESTS.md`). This document is kept as the design brief and C→JS reference; a couple of early assumptions (notably the planned CDN dependencies) were dropped in favour of a zero-dependency build — noted inline below.
+
 ## Target Features
 
 - Default site: **AAT (Anglo-Australian Telescope)**
 - Dropdown for all preset sites + Custom site
-- Custom site: Google Maps picker + IANA timezone selector
+- Custom site: manual latitude / longitude / elevation / timezone entry
 - Top panel: RA, Dec, Epoch, proper motion inputs (shared across all tabs)
 - Date/time: "Now" button (real-time, auto-updates every second) + manual entry
 - Five tabs:
@@ -18,12 +20,9 @@ Convert `skycalc.c` (6,629-line astronomical calculator by John Thorstensen) int
   4. **Observability** — seasonal chart (`o` function)
   5. **Planets** — major planet positions (`m` function)
 
-## Dependencies (external, CDN)
+## Dependencies
 
-- **Luxon** — IANA timezone handling for custom site modal only
-- **Google Maps JavaScript API** — location picker, lazy-loaded on demand
-
-Everything else: vanilla JS + HTML + CSS, inlined in one file.
+**None.** The shipped app is pure vanilla JS + HTML + CSS in a single file — no CDN scripts, no package manager, no runtime dependencies. (The originally-planned Luxon and Google Maps integrations for the custom-site modal were dropped; custom sites use manual latitude / longitude / elevation / timezone entry instead.)
 
 ---
 
@@ -55,7 +54,9 @@ Horizon depression: `horiz = sqrt(2 * elevHoriz / 6378140) * (180/PI)` degrees.
 
 ## Architecture
 
-### JS Module Sections (in one `<script>` block)
+### File structure & script blocks
+
+`skycalc.html` embeds three `<script>` blocks — **math engine**, **compute API**, and **UI layer**. The first two are maintained as standalone modules (`skycalc-math.js`, `skycalc-compute.js`) and embedded verbatim by `./build.sh` between `//<<<BEGIN…>>>` / `//<<<END…>>>` markers; a drift-guard test fails if the embedded copies fall out of sync. The math engine is organised as:
 
 ```
 SECTION 1:  Constants
@@ -186,7 +187,7 @@ Handle negative values explicitly (C struct carries explicit sign because `-0 !=
 
 1. **`Math.trunc` vs `Math.floor`**: C integer division truncates toward zero; `Math.floor` rounds toward −∞. Use `Math.trunc` for all intermediate steps in `date_to_jd` and `caldat`.
 
-2. **Longitude sign convention**: C uses west-positive decimal hours throughout. AAT = `−9.938` hrs (negative = east of Greenwich). Google Maps returns east-positive degrees. Conversion: `longitHrs = -longitudeDeg_east / 15.0`.
+2. **Longitude sign convention**: C uses west-positive decimal hours throughout. AAT = `−9.938` hrs (negative = east of Greenwich). Standard east-positive degrees convert as `longitHrs = -longitudeDeg_east / 15.0`.
 
 3. **Australian DST (AAT default)**: `use_dst = -2`. DST is in southern summer (Oct–Apr), so `jdb`/`jde` logic is reversed from northern hemisphere. During DST, `zone()` returns `stdz - 1`. Test: July → AEST (UTC+10); November → AEDT (UTC+11).
 
@@ -222,7 +223,7 @@ Handle negative values explicitly (C struct carries explicit sign because `-0 !=
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Custom Site modal: Google Maps click-to-set + manual lat/lon + IANA timezone `<select>` (populated from `Intl.supportedValuesOf('timeZone')`) + DST convention override.
+Custom Site modal: manual latitude / longitude / elevation / standard-timezone offset + DST convention override. (The originally-planned Google Maps picker and Luxon/IANA timezone selector were not built — manual entry proved simpler and keeps the app dependency-free.)
 
 ---
 
@@ -230,18 +231,21 @@ Custom Site modal: Google Maps click-to-set + manual lat/lon + IANA timezone `<s
 
 | Phase | Content | Status |
 |-------|---------|--------|
-| 1 | **Math core**: port all ~50 C functions; validate against compiled C binary | ⬜ TODO |
-| 2 | Site data + AppState; test AAT DST boundary logic | ⬜ TODO |
-| 3 | Circumstances tab + Now loop (1-second real-time display) | ⬜ TODO |
-| 4 | Almanac + Planets tabs (computed on demand) | ⬜ TODO |
-| 5 | Hourly Airmass tab | ⬜ TODO |
-| 6 | Observability tab (date range inputs + seasonal table) | ⬜ TODO |
-| 7 | Custom site + Google Maps modal + Luxon timezone picker | ⬜ TODO |
-| 8 | Polish: responsive CSS, print stylesheet, copy-to-clipboard | ⬜ TODO |
+| 1 | **Math core**: port all ~50 C functions; validate against compiled C binary | ✅ Done |
+| 2 | Site data + AppState; test AAT DST boundary logic | ✅ Done |
+| 3 | Circumstances tab + Now loop (1-second real-time display) | ✅ Done |
+| 4 | Almanac + Planets tabs (computed on demand) | ✅ Done |
+| 5 | Hourly Airmass tab | ✅ Done |
+| 6 | Observability tab (date range inputs + seasonal table) | ✅ Done |
+| 7 | Custom site (manual lat/lon/elev/timezone entry — Google Maps/Luxon dropped) | ✅ Done |
+| 8 | Polish: dark observatory theme, responsive CSS, airmass colour-coding | ✅ Done |
+| 9 | Extract compute layer to a module + `build.sh` + end-to-end tests & drift guard | ✅ Done |
 
 ---
 
-## Validation Strategy (Phase 1)
+## Validation Strategy
+
+Realized as the **180-test suite** in `tests/skycalc-tests.js` (see `tests/TESTS.md`): math primitives, four end-to-end scenarios, exact-minute almanac checks, end-to-end compute-API checks, and an embedded-source drift guard — all against captured C-binary output. The original strategy:
 
 Drive the compiled C binary (`./skycalc`) via stdin/stdout with scripted inputs:
 - Fixed site: AAT

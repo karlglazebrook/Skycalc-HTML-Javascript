@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.8.5 — 2026-07-10
+
+### Docs
+
+- Brought `PLAN.md` (the design brief) up to date with the finished project:
+  marked all implementation phases complete; corrected the dependencies section
+  (the app is zero-dependency — the planned Luxon / Google Maps custom-site
+  integrations were dropped in favour of manual entry); and documented the
+  modular `skycalc-math.js` / `skycalc-compute.js` + `./build.sh` structure and
+  the 180-test, drift-guarded validation suite.
+
+---
+
 ## v0.8.4 — 2026-07-10
 
 ### Testable compute layer + end-to-end tests (no behavior change)
