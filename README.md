@@ -1,4 +1,4 @@
-# Skycalc — Browser Astronomical Calculator
+# SkyCalc HTML — Browser Astronomical Calculator
 
 A single-file HTML/JavaScript port of **John Thorstensen's** (Dartmouth College) classic `skycalc.c` astronomical calculator. Open `skycalc.html` in any modern browser — no server, no build step, no dependencies.
 

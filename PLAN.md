@@ -4,7 +4,7 @@
 
 Convert `skycalc.c` (6,629-line astronomical calculator by John Thorstensen) into a single self-contained HTML file web application.
 
-> **Status: complete (v0.8.5).** Every phase below is done. The app ships as `skycalc.html` — live at <https://karlglazebrook.github.io/Skycalc-HTML-Javascript/> — and is validated by a 180-test suite against the compiled C binary (see `tests/TESTS.md`). This document is kept as the design brief and C→JS reference; a couple of early assumptions (notably the planned CDN dependencies) were dropped in favour of a zero-dependency build — noted inline below.
+> **Status: complete (v0.9.0).** Every phase below is done. The app ships as `skycalc.html` (branded **SkyCalc HTML**) — live at <https://karlglazebrook.github.io/Skycalc-HTML-Javascript/> — and is validated by a 191-test suite against the compiled C binary (see `tests/TESTS.md`). This document is kept as the design brief and C→JS reference; a couple of early assumptions (notably the planned CDN dependencies) were dropped in favour of a zero-dependency build — noted inline below.
 
 ## Target Features
 
@@ -245,7 +245,7 @@ Custom Site modal: manual latitude / longitude / elevation / standard-timezone o
 
 ## Validation Strategy
 
-Realized as the **180-test suite** in `tests/skycalc-tests.js` (see `tests/TESTS.md`): math primitives, four end-to-end scenarios, exact-minute almanac checks, end-to-end compute-API checks, and an embedded-source drift guard — all against captured C-binary output. The original strategy:
+Realized as the **191-test suite** in `tests/skycalc-tests.js` (see `tests/TESTS.md`): math primitives, four end-to-end scenarios, exact-minute almanac checks, end-to-end compute-API checks, and an embedded-source drift guard — all against captured C-binary output. The original strategy:
 
 Drive the compiled C binary (`./skycalc`) via stdin/stdout with scripted inputs:
 - Fixed site: AAT
