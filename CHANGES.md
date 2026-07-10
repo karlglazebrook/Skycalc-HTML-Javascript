@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.8.1 — 2026-07-10
+
+### Almanac / Circumstances — moon fixes
+
+- **Moonrise/moonset now use skycalc.c's algorithm.** The initial guess comes
+  from the moon's hour angle at local midnight (previously a fixed ±6 h offset)
+  and is refined at the −(0.83°+horizon) rise/set altitude; events are shown
+  only when they fall within skycalc's `moon_print` window of midnight. Fixes a
+  case where the moonrise was missing entirely and a far-off moonset was shown
+  instead (e.g. AAT, night of 2026-Jul-09: now Moonrise 02:11 and no moonset,
+  matching the C binary). Also corrects the "moon-free dark hours" figure.
+- **Illuminated fraction from sun–moon elongation.** Both the Almanac and the
+  Circumstances "Moon illum." now compute the lit fraction as
+  `0.5·(1 − cos(elongation))`, matching skycalc.c, instead of a lunar-age cosine
+  approximation that read a few percent low (e.g. 30% vs the old 26%).
+
+### Tests
+
+- Added 2 moon-fidelity assertions vs the C binary (moonrise time, illuminated
+  fraction); suite is now 161 tests.
+
+---
+
 ## v0.8 — 2026-07-10
 
 ### Time display & input (Circumstances top row)

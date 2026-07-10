@@ -61,7 +61,7 @@ The JS math is validated against the compiled C binary. Run the test suite with:
 ./run-tests.sh
 ```
 
-This runs 159 tests covering all function groups — Julian date, sidereal time, precession, alt/az/airmass, parallactic angle, sun, moon, DST handling, galactic/ecliptic coordinates, barycentric corrections, planets, rise/set iterators, and almanac event-time rounding — using the reference output from the C program as the ground truth.
+This runs 161 tests covering all function groups — Julian date, sidereal time, precession, alt/az/airmass, parallactic angle, sun, moon (position, rise/set, illumination), DST handling, galactic/ecliptic coordinates, barycentric corrections, planets, rise/set iterators, and almanac event-time rounding — using the reference output from the C program as the ground truth.
 
 All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles, ≤ 1 s for time corrections).
 
@@ -106,7 +106,7 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 | `CHANGES.md` | Version history |
 | `PLAN.md` | Implementation plan and architecture notes |
 | **`tests/`** | **Test suite and reference data** |
-| `tests/skycalc-tests.js` | 159-test validation suite |
+| `tests/skycalc-tests.js` | 161-test validation suite |
 | `tests/TESTS.md` | Test structure and accuracy tolerances |
 | `tests/c_input_s1.txt` … `c_input_s4.txt` | Scripted inputs used to drive the C binary for each scenario |
 | `tests/c_output_s1.txt` … `c_output_s4.txt` | Captured C binary output — ground truth for all hardcoded values |

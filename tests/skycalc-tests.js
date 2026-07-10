@@ -627,6 +627,32 @@ checkEq('S1 eve  12deg twilight (round)',  roundLocalHM(almEve12,   ALM_ZONE), '
 checkEq('S1 morn 12deg twilight (round)',  roundLocalHM(almMorn12,  ALM_ZONE), '06:11');
 
 // ============================================================
+// Moon almanac — rise/set and illumination vs C binary
+//   AAT, night of 2026-Jul-09 eve -> Jul-10 morn (zone -10, no DST).
+//   C binary (print_tonight): Moonrise 2 11 AST; illuminated fraction 0.299;
+//   moonset is NOT printed (it falls outside the ~moon_print window).
+//   Guards two fixes: (a) moonrise found via the HA-based guess at
+//   -(0.83+horiz) — the old fixed +6h/-horiz guess missed it entirely;
+//   (b) illuminated fraction from sun-moon elongation, not lunar age.
+// ============================================================
+section('Moon almanac vs C binary (2026-Jul-09 night, AAT)');
+
+const MN_ZONE  = -10;   // AAT July = standard time (no DST)
+const MN_HORIZ = Math.sqrt(2 * 670 / 6378140) * DEG_IN_RADIAN;
+const MN_jdMid = dateToJD(2026, 7, 9, 24, 0, 0) + MN_ZONE / 24;
+const MN_stMid = lst(MN_jdMid, AAT.longit);
+const MN_moon  = accumoon(MN_jdMid, AAT.lat, MN_stMid, AAT.elevsea);
+const MN_sun   = lpsun(MN_jdMid);
+const MN_alt   = -(0.83 + MN_HORIZ);
+const MN_ha    = haAlt(MN_moon.topodec, AAT.lat, MN_alt);
+const MN_tRise = adjTime(MN_moon.topora - MN_ha - MN_stMid);
+const MN_jdRise = jdMoonAlt(MN_alt, MN_jdMid + MN_tRise / 24, AAT.lat, AAT.longit, AAT.elevsea);
+const MN_ill   = 0.5 * (1 - Math.cos(subtend(MN_moon.topora, MN_moon.topodec, MN_sun.ra, MN_sun.dec)));
+
+checkEq('S1 moonrise (round to min)', roundLocalHM(MN_jdRise, MN_ZONE), '02:11');
+check('S1 moon illuminated fraction', MN_ill, 0.299, 0.002);
+
+// ============================================================
 // Summary
 // ============================================================
 

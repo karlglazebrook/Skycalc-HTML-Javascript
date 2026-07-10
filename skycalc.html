@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.1 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -491,7 +491,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.1</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2290,9 +2290,11 @@ function computeCircumstances(state) {
   const moon   = accumoon(jd, site.lat, lmst, site.elevsea);
   const moonHA = adjTime(lmst - moon.topora);
   const { alt: moonAlt } = altit(moon.topodec, moonHA, site.lat);
-  const la        = lunAge(jd);
   const moonPhase = moonPhaseText(jd);
-  const moonIllum = (1 - Math.cos(2 * PI * la.age / 29.5307)) / 2;
+  // Illuminated fraction from the sun–moon elongation (skycalc.c ill_frac),
+  // not the lunar-age approximation.
+  const moonIllum = 0.5 * (1 - Math.cos(
+    subtend(moon.topora, moon.topodec, sun.topora, sun.topodec)));
   const moonDistRad = subtend(prec.ra, prec.dec, moon.topora, moon.topodec);
   const moonDistDeg = moonDistRad * DEG_IN_RADIAN;
 
@@ -2362,47 +2364,56 @@ function computeAlmanac(state) {
   const jdEveT6   = jdSunset  ? sunEvt(-6,  jdSunset  + 0.5/24) : null;
   const jdMornT6  = jdSunrise ? sunEvt(-6,  jdSunrise - 0.5/24) : null;
 
-  const jdMoonset  = moonEvt(-horiz, jdmid - 6/24);
-  const jdMoonrise = moonEvt(-horiz, jdmid + 6/24);
-
   const darkHours = (jdMornT18 && jdEveT18)
     ? (jdMornT18 - jdEveT18) * 24 : null;
 
-  // Moon dark hours (moon down during astronomical darkness)
+  // Moon position & illumination at local midnight.
+  const lmstMid = lst(jdmid, site.longit);
+  const moonMid = accumoon(jdmid, site.lat, lmstMid, site.elevsea);
+  const sunMid  = lpsun(jdmid);
+  // Illuminated fraction from the true sun–moon elongation, matching
+  // skycalc.c's ill_frac = 0.5*(1 - cos(subtend(moon, sun))). (The old
+  // lunar-age cosine was a rough approximation and read a few % low.)
+  const moonIllumMid = 0.5 * (1 - Math.cos(
+    subtend(moonMid.topora, moonMid.topodec, sunMid.ra, sunMid.dec)));
+
+  // Moonrise / moonset — skycalc.c print_tonight method: the initial guess
+  // comes from the moon's hour angle at midnight (not a fixed ±6 h offset),
+  // then the alt iterator refines it at the −(0.83°+horizon) rise/set altitude.
+  // An event is only reported if it falls within ~moon_print hours of midnight
+  // (0.65× the sun-down span, min 6.5 h), so far-off crossings are suppressed.
+  const moonSetAlt = -(0.83 + horiz);
+  const { min: moonMinAlt, max: moonMaxAlt } = minMaxAlt(site.lat, moonMid.topodec);
+  const haMoon    = haAlt(moonMid.topodec, site.lat, moonSetAlt);
+  const tMoonrise = adjTime(moonMid.topora - haMoon - lmstMid);
+  const tMoonset  = adjTime(moonMid.topora + haMoon - lmstMid);
+  const setToRise = (jdSunset && jdSunrise) ? (jdSunrise - jdSunset) * 24 : 12;
+  const moonPrint = Math.abs(setToRise) > 10 ? 0.65 * Math.abs(setToRise) : 6.5;
+
+  let jdMoonrise = null, jdMoonset = null;
+  if (moonMaxAlt >= moonSetAlt && moonMinAlt <= moonSetAlt) {
+    // Moon does rise and set at this latitude / declination.
+    jdMoonrise = moonEvt(moonSetAlt, jdmid + tMoonrise / 24);
+    jdMoonset  = moonEvt(moonSetAlt, jdmid + tMoonset  / 24);
+  }
+  const showMoonrise = jdMoonrise && Math.abs(tMoonrise) < moonPrint;
+  const showMoonset  = jdMoonset  && Math.abs(tMoonset)  < moonPrint;
+
+  // Moon-free astronomical dark hours (moon below horizon during 18° dark).
   let moonDarkHours = null;
   if (jdEveT18 && jdMornT18) {
-    const darkStart = jdEveT18;
-    const darkEnd   = jdMornT18;
-    const mset = jdMoonset;
-    const mrise = jdMoonrise;
-    // Simple estimate: subtract moon-up time during dark period
+    const darkStart = jdEveT18, darkEnd = jdMornT18;
     let moonUp = 0;
-    if (mset && mset > darkStart && mset < darkEnd) {
-      // moon sets during dark period — moon was up from darkStart to mset
-      moonUp = (mset - darkStart) * 24;
-    }
-    if (mrise && mrise > darkStart && mrise < darkEnd) {
-      // moon rises during dark period
-      moonUp += (darkEnd - mrise) * 24;
-    }
-    if (mset && mrise && mset > darkStart && mrise > darkStart) {
-      // both events in dark window handled above
-    } else if (!mset && !mrise) {
-      // check if moon is up all night or down all night at midnight
-      const moonMid = accumoon(jdmid, site.lat, lst(jdmid, site.longit), site.elevsea);
-      const moonMidHA = adjTime(lst(jdmid, site.longit) - moonMid.topora);
+    if (jdMoonset  && jdMoonset  > darkStart && jdMoonset  < darkEnd) moonUp += (jdMoonset  - darkStart) * 24;
+    if (jdMoonrise && jdMoonrise > darkStart && jdMoonrise < darkEnd) moonUp += (darkEnd - jdMoonrise) * 24;
+    if (moonUp === 0) {
+      // No rise/set inside the dark window: moon is up or down the whole night.
+      const moonMidHA = adjTime(lmstMid - moonMid.topora);
       const { alt: moonMidAlt } = altit(moonMid.topodec, moonMidHA, site.lat);
-      if (moonMidAlt > -horiz) moonUp = darkHours || 0; // moon up all dark
+      if (moonMidAlt > moonSetAlt) moonUp = darkHours || 0;
     }
     moonDarkHours = Math.max(0, (darkHours || 0) - moonUp);
   }
-
-  // Moon at midnight
-  const moonMid = accumoon(jdmid, site.lat, lst(jdmid, site.longit), site.elevsea);
-  const laMid   = lunAge(jdmid);
-  const moonIllumMid = (1 - Math.cos(2 * PI * laMid.age / 29.5307)) / 2;
-
-  const lmstMid = lst(jdmid, site.longit);
 
   function fmt(jd_evt) {
     if (!jd_evt) return { local: '—', ut: '' };
@@ -2423,8 +2434,8 @@ function computeAlmanac(state) {
     mornT12:  fmt(jdMornT12),
     eveT6:    fmt(jdEveT6),
     mornT6:   fmt(jdMornT6),
-    moonrise: fmt(jdMoonrise),
-    moonset:  fmt(jdMoonset),
+    moonrise: fmt(showMoonrise ? jdMoonrise : null),
+    moonset:  fmt(showMoonset  ? jdMoonset  : null),
     darkHours,
     moonDarkHours,
     moonIllumMid,
