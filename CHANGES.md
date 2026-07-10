@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.10.0 — 2026-07-10
+
+### Site location
+
+- Added a **📍 My Location** button next to the site selector: it reads the
+  browser's geolocation, fills a custom site (latitude, longitude, and elevation
+  when available; time zone from the browser's current UTC offset, DST off), and
+  opens the editor for review. Geolocation needs a secure context — it works on
+  the hosted `https://…github.io/…` page; browsers may block it on a bare
+  `file://` open.
+- The header now shows a **live site-coordinates readout** (`lat°N/S lon°E/W
+  elev m`) for whichever site is selected.
+- Clicking that readout opens the coordinate editor **pre-filled with the
+  current site** (previously only the blank "Custom Site" slot was editable), so
+  any site's latitude / longitude / elevation / time zone / DST rule can be
+  viewed and tweaked.
+
+---
+
 ## v0.9.0 — 2026-07-10
 
 ### UI

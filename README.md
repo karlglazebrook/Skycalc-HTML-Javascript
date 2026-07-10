@@ -18,7 +18,8 @@ A single-file HTML/JavaScript port of **John Thorstensen's** (Dartmouth College)
 - **Credits** — Attribution for the original `skycalc.c` and this port
 - **▶ NOW mode** — Live 1-second update from system clock
 - **14 preset sites** — AAT (default), Kitt Peak, ESO, VLT, Palomar, Mauna Kea, Lick, and more
-- **Custom site** — Enter any latitude, longitude, elevation, and timezone
+- **📍 My Location** — one click sets a custom site from your browser's geolocation
+- **Custom site** — a live coordinate readout beside the site selector; click it to view/edit any site's latitude, longitude, elevation, timezone, and DST rule
 - **Airmass colour-coding** — Green (excellent) → blue (good) → amber (marginal) → red (poor/below horizon)
 
 ---

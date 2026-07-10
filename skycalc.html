@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SkyCalc HTML v0.9.0 — Astronomical Calculator</title>
+<title>SkyCalc HTML v0.10.0 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -80,7 +80,29 @@ select:focus, input:focus {
   border-color: var(--accent);
 }
 
-#site-select { width: 260px; }
+#site-select { width: 240px; }
+
+.icon-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--accent); }
+
+.site-coords {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--border);
+}
+.site-coords:hover { color: var(--accent); border-bottom-color: var(--accent); }
 #ra-input { width: 110px; }
 #dec-input { width: 110px; }
 #epoch-input { width: 70px; }
@@ -505,10 +527,12 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SkyCalc HTML <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.9.0</span></div>
+    <div class="logo">SkyCalc HTML <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.10.0</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
+    <button id="my-loc-btn" class="icon-btn" title="Use my current location">📍</button>
+    <span class="site-coords" id="site-coords" title="Click to view / edit site coordinates">—</span>
 
     <span class="header-label">RA:</span>
     <input type="text" id="ra-input" value="12 00 00" placeholder="12 00 00">
@@ -3211,17 +3235,68 @@ function renderObservability() {
 }
 
 // ── Custom site modal ──────────────────────────────────────────────
-function openModal() {
-  const x = SITES.find(s => s.code === 'x');
-  document.getElementById('cs-name').value  = x.name;
-  document.getElementById('cs-lat').value   = x.lat.toFixed(4);
+function openModal(site) {
+  const s = site || AppState.site;
+  document.getElementById('cs-name').value  = s.name;
+  document.getElementById('cs-lat').value   = s.lat.toFixed(4);
   // Convert west-positive hours to east-positive degrees
-  document.getElementById('cs-lon').value   = (-x.longit * 15).toFixed(4);
-  document.getElementById('cs-elev').value  = x.elevsea;
-  document.getElementById('cs-horiz').value = x.elevhoriz;
-  document.getElementById('cs-zone').value  = (-x.stdz).toFixed(1);
-  document.getElementById('cs-dst').value   = x.useDST;
+  document.getElementById('cs-lon').value   = (-s.longit * 15).toFixed(4);
+  document.getElementById('cs-elev').value  = s.elevsea;
+  document.getElementById('cs-horiz').value = s.elevhoriz;
+  document.getElementById('cs-zone').value  = (-s.stdz).toFixed(1);
+  document.getElementById('cs-dst').value   = s.useDST;
   elModalOver.classList.add('visible');
+}
+
+// Header readout of the current site's coordinates.
+function fmtSiteCoords(s) {
+  const lonE = -s.longit * 15;   // west-positive hours → east-positive degrees
+  return `${Math.abs(s.lat).toFixed(3)}°${s.lat >= 0 ? 'N' : 'S'} `
+       + `${Math.abs(lonE).toFixed(3)}°${lonE >= 0 ? 'E' : 'W'} `
+       + `${Math.round(s.elevsea)} m`;
+}
+function updateSiteCoords() {
+  document.getElementById('site-coords').textContent = fmtSiteCoords(AppState.site);
+}
+
+// Select the (already-populated) custom site in the dropdown and apply it.
+function applyCustomSite(x) {
+  const idx = SITES.indexOf(x);
+  for (const opt of elSite.options) {
+    if (parseInt(opt.value) === idx) opt.textContent = x.name;
+  }
+  elSite.value = String(idx);
+  AppState.site = x;
+  updateSiteCoords();
+  renderActiveTab();
+  updateHeaderJD();
+}
+
+// Fill the custom site from the browser's geolocation, then open the modal to
+// review/adjust. Longitude is stored west-positive in hours; the time zone is
+// taken from the browser's current UTC offset (DST rule off — adjust it in the
+// modal if you need standard-time behaviour for other dates).
+function myLocation() {
+  const btn = document.getElementById('my-loc-btn');
+  if (!navigator.geolocation) { alert('Geolocation is not available in this browser.'); return; }
+  btn.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.textContent = '📍';
+    const x = SITES.find(s => s.code === 'x');
+    x.name      = 'My Location';
+    x.lat       = pos.coords.latitude;
+    x.longit    = -pos.coords.longitude / 15;
+    const alt   = pos.coords.altitude;
+    x.elevsea   = (alt != null && isFinite(alt)) ? Math.round(alt) : 0;
+    x.elevhoriz = x.elevsea;
+    x.stdz      = new Date().getTimezoneOffset() / 60;  // west-positive hrs, current offset
+    x.useDST    = 0;
+    applyCustomSite(x);
+    openModal(x);
+  }, err => {
+    btn.textContent = '📍';
+    alert('Could not get your location: ' + err.message);
+  }, { timeout: 10000 });
 }
 
 function closeModal() { elModalOver.classList.remove('visible'); }
@@ -3246,6 +3321,7 @@ function saveModal() {
     }
   }
   AppState.site = x;
+  updateSiteCoords();
   closeModal();
   renderActiveTab();
 }
@@ -3254,10 +3330,14 @@ function saveModal() {
 elSite.addEventListener('change', () => {
   const idx = parseInt(elSite.value);
   AppState.site = SITES[idx];
+  updateSiteCoords();
   if (AppState.site.code === 'x') openModal();
   else renderActiveTab();
   updateHeaderJD();
 });
+
+document.getElementById('my-loc-btn').addEventListener('click', myLocation);
+document.getElementById('site-coords').addEventListener('click', () => openModal(AppState.site));
 
 elRA.addEventListener('change', () => {
   AppState.ra = parseRA(elRA.value);
@@ -3316,6 +3396,7 @@ elModalOver.addEventListener('click', e => { if (e.target === elModalOver) close
 // ── Init ───────────────────────────────────────────────────────────
 function init() {
   populateSiteSelect();
+  updateSiteCoords();
 
   // Default observability date range: next 6 months
   const now = new Date();
