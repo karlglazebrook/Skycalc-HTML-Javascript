@@ -90,3 +90,37 @@ The JS port agrees with the C binary to **~4 s in time, ~0.1° in angles, ~0.1 k
 The main exceptions are:
 - **Near-horizon airmass** — sec(z) is geometrically singular near 0° altitude; a small error in altitude causes a large error in sec(z).
 - **Planet positions** — the low-precision algorithm used (matching `skycalc.c`) is accurate to ~0.1°, which is reflected in the looser tolerances for planet RA and Dec.
+
+---
+
+## Deliberate deviations from `skycalc.c`
+
+A full audit (2026-07) confirmed the math engine and the Circumstances tab are
+faithful, term-for-term ports, and corrected six divergences in the
+Almanac / Hourly / Observability tabs (see `CHANGES.md` v0.8.1–v0.8.2). A few
+places **intentionally differ** from `skycalc.c`; these are design choices, not
+bugs, and should be preserved:
+
+- **Hourly Sun/Moon altitude columns use `accusun` / `accumoon` (high precision)
+  where C uses `lpsun` / `lpmoon` (low precision, marked "close enuf" in the C
+  source).** The JS is therefore *more* accurate here; the Sun/Moon alt columns
+  can differ from the C output by ~arcminutes, and the exact row where night
+  begins/ends may shift by one. Matching C would mean deliberately downgrading
+  accuracy, so we keep the high-precision routines.
+- **Planets tab, Sun row** uses `accusun(jd, LMST, lat)` at the real observer,
+  where C's `pposns` uses `accusun(jd, 0, 0)` (a lat = 0, LST = 0 reference
+  point). Differs by up to the solar parallax (~8.8″ ≈ 0.0024°) — below the
+  table's 0.1° display precision.
+- **Planets tab, Moon row** passes the site elevation to `accumoon`, where C
+  passes `0`. Adds the observer-height parallax term (~1″) — negligible.
+- **Hourly local-time labels** use a single zone offset for the whole table,
+  where C recomputes the offset per row. Only matters on the ~2 nights/year that
+  straddle a standard/daylight-time change, and only affects the *label* — the
+  row values (alt/az/airmass) are unaffected.
+- **`barycor` retains the original `skycalc.c` `zc += mass*zc` quirk** on purpose,
+  so the barycentric correction and BJD agree with the C binary to the last
+  digit rather than being "corrected" away from the reference.
+
+Also *absent* from the JS (feature omissions, not accuracy trade-offs): the
+lunar sky-brightness readout, and the solar/lunar-eclipse, `planet_alert`, and
+lunar-limb-proximity warnings that C prints in its circumstances output.
