@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.9 — 2026-07-10
+
+### UI
+
+- **Almanac** is now the first tab and the default tab shown on load (previously
+  Circumstances), matching the usual night-planning workflow.
+
+---
+
 ## v0.8.8 — 2026-07-10
 
 ### Circumstances / Hourly — display polish to match skycalc.c
