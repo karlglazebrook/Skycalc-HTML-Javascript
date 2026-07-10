@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.8.4 — 2026-07-10
+
+### Testable compute layer + end-to-end tests (no behavior change)
+
+- **Extracted the compute API to `skycalc-compute.js`.** The five `compute*`
+  functions and their helpers are now a standalone module (previously inline in
+  `skycalc.html`). `./build.sh` embeds `skycalc-math.js` and `skycalc-compute.js`
+  verbatim into `skycalc.html` (between `//<<<BEGIN…>>>` / `//<<<END…>>>`
+  markers), so the app stays a single self-contained file — edit the sources,
+  then run `./build.sh`.
+- **Added end-to-end tests** that `load()` and call the *actual* compute
+  functions (`computeCircumstances`, `computeAlmanac`, …) for scenario 1 and
+  compare whole results — precessed coordinates, HA, alt/az, airmass, sunset,
+  all twilights, night center, moonrise/set, illuminated fraction — to the C
+  binary (`c_output_s1.txt`). This exercises the compute-layer glue where the
+  recent moon/twilight/rounding bugs lived; the prior suite only tested the math
+  primitives, which is why those bugs slipped through.
+- **Added a drift guard** that verifies the math + compute blocks embedded in
+  `skycalc.html` are byte-identical to the source `.js` files, so what the tests
+  run can never silently diverge from what the app runs.
+- Suite grows 162 → **180 tests**. No change to app behavior or numerical output.
+
+---
+
 ## v0.8.3 — 2026-07-10
 
 ### Circumstances — lunar sky brightness

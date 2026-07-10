@@ -46,10 +46,12 @@ The code is strictly separated into three layers inside a single HTML file:
 | Layer | Lines | Contents |
 |-------|-------|----------|
 | **Math engine** | ~1460 | Direct JS port of `skycalc.c` — all ~50 astronomical functions. No DOM access. Embedded verbatim from `skycalc-math.js`. |
-| **Compute API** | ~480 | Five pure functions (`computeCircumstances`, `computeAlmanac`, `computePlanets`, `computeHourly`, `computeObservability`) that translate AppState into display-ready data objects. No DOM access. |
-| **UI layer** | ~570 | AppState, event handlers, render functions. Only this layer touches the DOM. |
+| **Compute API** | ~570 | Five pure functions (`computeCircumstances`, `computeAlmanac`, `computePlanets`, `computeHourly`, `computeObservability`) that translate app state into display-ready data objects. No DOM access. Embedded verbatim from `skycalc-compute.js`. |
+| **UI layer** | ~600 | AppState, event handlers, render functions. Only this layer touches the DOM. |
 
-This separation means the math can be validated independently, and the UI can be reskinned or ported to a different framework without touching the astronomy code.
+This separation means the math **and** the compute layer can be validated independently, and the UI can be reskinned or ported to a different framework without touching the astronomy code.
+
+The math engine and compute API live in the standalone files `skycalc-math.js` and `skycalc-compute.js`; **`./build.sh`** embeds them verbatim into `skycalc.html` (between `//<<<BEGIN…>>>` / `//<<<END…>>>` markers) so the app stays a single self-contained file. Edit the `.js` sources, then run `./build.sh`. A drift-guard test fails if `skycalc.html` is ever out of sync with the sources, so the embedded copies can't silently diverge.
 
 ---
 
@@ -61,7 +63,7 @@ The JS math is validated against the compiled C binary. Run the test suite with:
 ./run-tests.sh
 ```
 
-This runs 162 tests covering all function groups — Julian date, sidereal time, precession, alt/az/airmass, parallactic angle, sun, moon (position, rise/set, illumination), DST handling, galactic/ecliptic coordinates, barycentric corrections, planets, rise/set iterators, and almanac event-time rounding — using the reference output from the C program as the ground truth.
+This runs 180 tests covering all function groups — Julian date, sidereal time, precession, alt/az/airmass, parallactic angle, sun, moon (position, rise/set, illumination), DST handling, galactic/ecliptic coordinates, barycentric corrections, planets, rise/set iterators, and almanac event-time rounding — using the reference output from the C program as the ground truth. This includes **end-to-end tests** that call the actual compute API (`computeCircumstances`, `computeAlmanac`, …) and compare whole results to the C binary, plus a **drift guard** that verifies the copies embedded in `skycalc.html` match the `skycalc-math.js` / `skycalc-compute.js` sources.
 
 All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles, ≤ 1 s for time corrections).
 
@@ -100,13 +102,15 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 |------|-------------|
 | `skycalc.html` | The complete single-file web app |
 | `index.html` | Tiny redirect to `skycalc.html`, so the GitHub Pages root URL opens the app |
-| `skycalc-math.js` | Math engine (source for the embedded block in the HTML) |
+| `skycalc-math.js` | Math engine — source for the embedded block in the HTML |
+| `skycalc-compute.js` | Compute API — source for the embedded block in the HTML |
+| `build.sh` | Re-embeds the two `.js` sources into `skycalc.html` |
 | `skycalc.c` | Original C source by John Thorstensen |
 | `run-tests.sh` | Test runner (requires macOS JavaScriptCore) |
 | `CHANGES.md` | Version history |
 | `PLAN.md` | Implementation plan and architecture notes |
 | **`tests/`** | **Test suite and reference data** |
-| `tests/skycalc-tests.js` | 162-test validation suite |
+| `tests/skycalc-tests.js` | 180-test validation suite |
 | `tests/TESTS.md` | Test structure and accuracy tolerances |
 | `tests/c_input_s1.txt` … `c_input_s4.txt` | Scripted inputs used to drive the C binary for each scenario |
 | `tests/c_output_s1.txt` … `c_output_s4.txt` | Captured C binary output — ground truth for all hardcoded values |

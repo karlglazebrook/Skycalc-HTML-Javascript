@@ -1,6 +1,6 @@
 # Test Suite — skycalc-tests.js
 
-162 tests, all passing. Run with:
+180 tests, all passing. Run with:
 
 ```bash
 ./run-tests.sh
@@ -31,7 +31,11 @@ The suite is organised in two parts:
 
 Scenarios 2 and 3 intentionally include below-horizon and daytime cases (testing the math in non-observable conditions). Four distinct DST regimes are covered: Australian, Chilean, and two no-DST sites (MST, HST).
 
-A final section, **Almanac rounded event times**, asserts the scenario-1 sunset, sunrise, and 18°/12° twilight times *to the exact minute* against the C binary output (`c_output_s1.txt`). The C program rounds these via `print_time(...,0)`; this section locks the JS port's `fmtLocalTime`/`fmtUTTime` rounding to match, guarding against a regression back to truncation.
+A section, **Almanac rounded event times**, asserts the scenario-1 sunset, sunrise, and 18°/12° twilight times *to the exact minute* against the C binary output (`c_output_s1.txt`). The C program rounds these via `print_time(...,0)`; this section locks the JS port's `fmtLocalTime`/`fmtUTTime` rounding to match, guarding against a regression back to truncation.
+
+**End-to-end compute API.** The suite `load()`s not only `skycalc-math.js` but also `skycalc-compute.js`, and calls the *actual* app functions — `computeCircumstances`, `computeAlmanac`, … — for scenario 1, comparing whole results (precessed RA/Dec, HA, alt/az, airmass, sunset/sunrise, all twilights, night center, moonrise/set, illuminated fraction) to `c_output_s1.txt`. Unlike the section tests, which exercise the math primitives directly, these run the compute-layer *glue* (the initial guesses, altitude thresholds, formula choices) — the layer where the moon-rise-guess, lunar-age-illumination, and truncation bugs lived. They would have failed on day one for each of those.
+
+**Drift guard.** Because the app ships as a single self-contained `skycalc.html` with the two `.js` sources embedded verbatim (via `./build.sh`, between `//<<<BEGIN…>>>` / `//<<<END…>>>` markers), a guard reads `skycalc.html`, extracts the embedded blocks, and asserts they are byte-identical to `skycalc-math.js` and `skycalc-compute.js`. If they differ, the test fails with a "run `./build.sh`" signal — so the tested sources can never silently diverge from the code the app actually runs.
 
 ---
 

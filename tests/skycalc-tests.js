@@ -4,6 +4,7 @@
 // Or:        ./run-tests.sh
 
 load('skycalc-math.js');
+load('skycalc-compute.js');   // the app's compute API — exercised end-to-end below
 
 // ============================================================
 // Test harness
@@ -652,6 +653,58 @@ const MN_ill   = 0.5 * (1 - Math.cos(subtend(MN_moon.topora, MN_moon.topodec, MN
 
 checkEq('S1 moonrise (round to min)', roundLocalHM(MN_jdRise, MN_ZONE), '02:11');
 check('S1 moon illuminated fraction', MN_ill, 0.299, 0.002);
+
+// ============================================================
+// End-to-end compute API — calls the ACTUAL app functions from
+// skycalc-compute.js (not re-implemented here) for scenario 1
+// (AAT, 2026-Mar-15 12:00 UT, RA 12h Dec −45°) and checks their
+// output against the C binary (tests/c_output_s1.txt). This is the
+// layer where the moon / twilight / rounding bugs lived — unit tests
+// of the math primitives alone could not catch them.
+// ============================================================
+section('End-to-end compute API vs C binary (scenario 1)');
+
+const E2E_STATE = { site: SITES[0], jdUT: dateToJD(2026,3,15,12,0,0), ra: 12.0, dec: -45.0, epoch: 2000.0 };
+
+const e2eCirc = computeCircumstances(E2E_STATE);
+check  ('E2E circ precessed RA (hrs)',  e2eCirc.prec.ra,  12.022417,  0.001);
+check  ('E2E circ precessed Dec (deg)', e2eCirc.prec.dec, -45.145833, 0.01);
+check  ('E2E circ hour angle (hrs)',    e2eCirc.ha,       -2.544167,  0.01);
+check  ('E2E circ altitude (deg)',      e2eCirc.alt,       57.35,     0.05);
+check  ('E2E circ azimuth (deg)',       e2eCirc.az,        126.11,    0.1);
+check  ('E2E circ sec(z)',              e2eCirc.secz,      1.188,     0.005);
+
+const e2eAlm = computeAlmanac(E2E_STATE);
+checkEq('E2E almanac sunset',         e2eAlm.sunset.local,      '19:26');
+checkEq('E2E almanac sunrise',        e2eAlm.sunrise.local,     '07:00');
+checkEq('E2E almanac eve 18deg twi',  e2eAlm.eveT18.local,      '20:43');
+checkEq('E2E almanac morn 18deg twi', e2eAlm.mornT18.local,     '05:43');
+checkEq('E2E almanac eve 12deg twi',  e2eAlm.eveT12.local,      '20:14');
+checkEq('E2E almanac morn 12deg twi', e2eAlm.mornT12.local,     '06:11');
+checkEq('E2E almanac night center',   e2eAlm.nightCenter.local, '01:13');
+checkEq('E2E almanac moonrise',       e2eAlm.moonrise.local,    '03:45');
+checkEq('E2E almanac moonset',        e2eAlm.moonset.local,     '17:14');
+check  ('E2E almanac moon illum frac',e2eAlm.moonIllumMid,      0.135, 0.002);
+
+// ============================================================
+// Drift guard — verify skycalc.html's embedded math + compute blocks
+// are byte-identical to the source .js files, so the tests above
+// exercise the same code the app actually runs. If this fails,
+// run ./build.sh to re-embed the sources.
+// ============================================================
+section('Embedded-source drift guard');
+
+const GUARD_HTML = readFile('skycalc.html');
+function embeddedBlock(name) {
+  const b = GUARD_HTML.indexOf('BEGIN:' + name + '>>>');
+  const s = GUARD_HTML.indexOf('\n', b) + 1;
+  const e = GUARD_HTML.indexOf('//<<<END:' + name + '>>>');
+  return GUARD_HTML.slice(s, e).replace(/\s+$/, '');
+}
+checkEq('skycalc.html math block == skycalc-math.js',
+        embeddedBlock('skycalc-math.js'),    readFile('skycalc-math.js').replace(/\s+$/, ''));
+checkEq('skycalc.html compute block == skycalc-compute.js',
+        embeddedBlock('skycalc-compute.js'), readFile('skycalc-compute.js').replace(/\s+$/, ''));
 
 // ============================================================
 // Summary

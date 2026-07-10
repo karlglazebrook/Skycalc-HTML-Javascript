@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.3 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.4 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -491,7 +491,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.3</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.4</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -632,6 +632,7 @@ select:focus, input:focus {
    MATH ENGINE — skycalc-math.js embedded (do not edit here)
    Source: skycalc-math.js | Rebuild: ./build.sh
    ================================================================ */
+//<<<BEGIN:skycalc-math.js>>>
 // skycalc-math.js
 // JavaScript port of skycalc.c astronomical math functions
 // by John Thorstensen; ported by Karl Glazebrook / Claude
@@ -2087,13 +2088,21 @@ function runTests() {
 }
 
 // runTests();  // Call from skycalc-tests.js, not here
-
+//<<<END:skycalc-math.js>>>
 </script>
 
 <!-- ══════════════════════════════════════════════════════════════════
      SCRIPT BLOCK 2 — COMPUTE API (pure functions, no DOM)
+     Source: skycalc-compute.js | Rebuild: ./build.sh
 ══════════════════════════════════════════════════════════════════════ -->
 <script>
+//<<<BEGIN:skycalc-compute.js>>>
+// skycalc-compute.js
+// =====================================================================
+// COMPUTE API — pure functions (no DOM). Embedded verbatim into
+// skycalc.html by ./build.sh. Depends on skycalc-math.js (load first).
+// =====================================================================
+
 // ── Site data ──────────────────────────────────────────────────────
 const SITES = [
   { code:'a', name:'Anglo-Australian Tel., Siding Spring', longit:-9.937739, lat:-31.277039, elevsea:1149, elevhoriz:670,  stdz:-10, useDST:-2 },
@@ -2658,6 +2667,7 @@ function computeObservability(state, startJD, endJD, sunAltDeg) {
   results.sort((a, b) => a.jdPhase - b.jdPhase);
   return results;
 }
+//<<<END:skycalc-compute.js>>>
 </script>
 
 <!-- ══════════════════════════════════════════════════════════════════
