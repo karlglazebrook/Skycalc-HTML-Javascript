@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.8.2 — 2026-07-10
+
+### Almanac / Hourly / Observability — closer fidelity to skycalc.c
+
+Following a full audit of the port vs `skycalc.c` (the math engine and the
+Circumstances tab were already faithful), six divergences were corrected:
+
+- **Sun & twilight event guesses** now seeded from the sun's hour angle at
+  midnight and refined (matching `print_tonight`), instead of fixed clock
+  offsets (`jdmid ± 6 h`, `jdSunset ± 1.5 h`) — the same bug class as the
+  earlier moon fix; avoids mis-convergence near solstice / high latitude.
+  (Almanac and Observability.)
+- **Hourly airmass table** now shows every row down to sunset/sunrise (uses the
+  sun-below-horizon test; was skipping rows with the sun above −5°) and centers
+  the row lattice on the middle of the night (`jdcent`, snapped to the UT hour,
+  spanning the sunset→sunrise length) rather than clock midnight ± 13 h —
+  matching `hourly_airmass`.
+- **Sun rise/set altitude** is now `−0.83°` (matching skycalc.c), not `−0.833°`,
+  consistent with the moon path.
+- **Polar handling**: the Almanac sets astronomical-dark to 0 h
+  ("sun up all night") or 24 h ("dark all day") in the polar cases skycalc.c
+  handles, instead of showing "—".
+- **Night center** is now shown in the Almanac Sun card (e.g. `00:09`), as
+  skycalc.c prints.
+
+All values verified against the C binary (AAT, night of 2026-Jul-09: sunset
+17:20, twilights 18:12 / 18:41 / 05:36 / 06:06, night center 00:09, astronomical
+dark 10.9 h, moon-free dark 7.5 h).
+
+### Tests
+
+- Added a night-center fidelity assertion vs the C binary; suite is now 162 tests.
+
+---
+
 ## v0.8.1 — 2026-07-10
 
 ### Almanac / Circumstances — moon fixes

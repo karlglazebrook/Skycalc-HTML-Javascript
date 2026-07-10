@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.1 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.2 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -491,7 +491,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.1</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.2</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2345,6 +2345,9 @@ function computeAlmanac(state) {
   const mornCal = caldat(jdEveNoon + 1);
 
   const horiz = horizDeg(site);
+  const lmstMid = lst(jdmid, site.longit);
+  const sunMid  = lpsun(jdmid);   // low-precision sun at midnight — seeds the
+                                  // event guesses and the illuminated fraction.
 
   function sunEvt(alt, guess) {
     const r = jdSunAlt(alt, guess, site.lat, site.longit);
@@ -2355,25 +2358,44 @@ function computeAlmanac(state) {
     return r < -999 ? null : r;
   }
 
-  const jdSunset  = sunEvt(-0.833 - horiz, jdmid - 6/24);
-  const jdSunrise = sunEvt(-0.833 - horiz, jdmid + 6/24);
-  const jdEveT18  = jdSunset  ? sunEvt(-18, jdSunset  + 1.5/24) : null;
-  const jdMornT18 = jdSunrise ? sunEvt(-18, jdSunrise - 1.5/24) : null;
-  const jdEveT12  = jdSunset  ? sunEvt(-12, jdSunset  + 1/24)   : null;
-  const jdMornT12 = jdSunrise ? sunEvt(-12, jdSunrise - 1/24)   : null;
-  const jdEveT6   = jdSunset  ? sunEvt(-6,  jdSunset  + 0.5/24) : null;
-  const jdMornT6  = jdSunrise ? sunEvt(-6,  jdSunrise - 0.5/24) : null;
+  // Sun/twilight events — skycalc.c print_tonight method: seed each iterator
+  // from the sun's hour angle at midnight (not a fixed clock offset), then
+  // refine. haAlt returns +1000 if the sun stays ABOVE this altitude all night
+  // (event never happens — e.g. sun up all night) and −1000 if it never reaches
+  // it (e.g. never rises above −18° = full darkness all day).
+  function sunEvents(alt) {
+    const ha = haAlt(sunMid.dec, site.lat, alt);
+    if (ha >  900) return { eve: null, morn: null, alwaysAbove: true };
+    if (ha < -900) return { eve: null, morn: null, alwaysBelow: true };
+    return {
+      eve:  sunEvt(alt, jdmid + adjTime(sunMid.ra + ha - lmstMid) / 24),
+      morn: sunEvt(alt, jdmid + adjTime(sunMid.ra - ha - lmstMid) / 24),
+    };
+  }
+  const sset = sunEvents(-0.83 - horiz);
+  const t18  = sunEvents(-18);
+  const t12  = sunEvents(-12);
+  const t6   = sunEvents(-6);
+  const jdSunset = sset.eve, jdSunrise = sset.morn;
+  const jdEveT18 = t18.eve,  jdMornT18 = t18.morn;
+  const jdEveT12 = t12.eve,  jdMornT12 = t12.morn;
+  const jdEveT6  = t6.eve,   jdMornT6  = t6.morn;
 
-  const darkHours = (jdMornT18 && jdEveT18)
-    ? (jdMornT18 - jdEveT18) * 24 : null;
+  // Astronomical dark span (18°→18°), with the polar branches skycalc.c prints.
+  let darkHours;
+  if      (sset.alwaysAbove)      darkHours = 0;    // sun up all night
+  else if (t18.alwaysBelow)       darkHours = 24;   // sun never rises above −18° — dark all day
+  else if (t18.alwaysAbove)       darkHours = 0;    // sun never drops below −18°
+  else if (jdEveT18 && jdMornT18) darkHours = (jdMornT18 - jdEveT18) * 24;
+  else                            darkHours = null;
+
+  // Center of night = midpoint of sunset and sunrise (skycalc.c jdcent).
+  const jdNightCenter = (jdSunset && jdSunrise) ? (jdSunset + jdSunrise) / 2 : null;
 
   // Moon position & illumination at local midnight.
-  const lmstMid = lst(jdmid, site.longit);
   const moonMid = accumoon(jdmid, site.lat, lmstMid, site.elevsea);
-  const sunMid  = lpsun(jdmid);
   // Illuminated fraction from the true sun–moon elongation, matching
-  // skycalc.c's ill_frac = 0.5*(1 - cos(subtend(moon, sun))). (The old
-  // lunar-age cosine was a rough approximation and read a few % low.)
+  // skycalc.c's ill_frac = 0.5*(1 - cos(subtend(moon, sun))).
   const moonIllumMid = 0.5 * (1 - Math.cos(
     subtend(moonMid.topora, moonMid.topodec, sunMid.ra, sunMid.dec)));
 
@@ -2434,6 +2456,7 @@ function computeAlmanac(state) {
     mornT12:  fmt(jdMornT12),
     eveT6:    fmt(jdEveT6),
     mornT6:   fmt(jdMornT6),
+    nightCenter: fmt(jdNightCenter),
     moonrise: fmt(showMoonrise ? jdMoonrise : null),
     moonset:  fmt(showMoonset  ? jdMoonset  : null),
     darkHours,
@@ -2489,12 +2512,28 @@ function computeHourly(state) {
   const jdMidnightLocal = dateToJD(y, mo, d, 24, 0, 0);
   const jdmid = jdMidnightLocal + zone / 24;
 
-  const curEpoch = 2000.0 + (jd - J2000) / 365.25;
+  const curEpoch = 2000.0 + (jdmid - J2000) / 365.25;
   const prec = precrot(ra, dec, epoch, curEpoch);
 
+  // Time lattice — skycalc.c hourly_airmass: center on the middle of the night
+  // (jdcent = midpoint of sunset & sunrise, snapped to the nearest UT hour) and
+  // span ±hrSpan hours (half the sunset→sunrise length), rather than clock
+  // midnight ±13 h. Rows with the sun above the horizon are skipped.
+  const sunMid = lpsun(jdmid);
+  const hasset = haAlt(sunMid.dec, site.lat, -0.83);
+  let jdcent, hrSpan;
+  if (hasset > 900 || hasset < -900) {
+    jdcent = jdmid; hrSpan = 12;              // sun never sets / never rises
+  } else {
+    const jdsset  = jdSunAlt(-0.83, jdmid - (12 - hasset) / 24, site.lat, site.longit);
+    const jdsrise = jdSunAlt(-0.83, jdmid + (12 - hasset) / 24, site.lat, site.longit);
+    hrSpan = Math.round(12 * (jdsrise - jdsset));
+    jdcent = Math.round(24 * (jdsset + jdsrise) / 2) / 24 + 0.00001;  // snap to UT hour
+  }
+
   const rows = [];
-  for (let dh = -13; dh <= 13; dh += 1) {
-    const jdt = jdmid + dh / 24;
+  for (let i = -hrSpan; i <= hrSpan; i++) {
+    const jdt  = jdcent + i / 24;
     const sid  = lst(jdt, site.longit);
     const ha   = adjTime(sid - prec.ra);
     const { alt, az } = altit(prec.dec, ha, site.lat);
@@ -2505,14 +2544,14 @@ function computeHourly(state) {
     const sunHA = adjTime(sid - sun.topora);
     const { alt: sunAlt } = altit(sun.topodec, sunHA, site.lat);
 
-    if (sunAlt > -5) continue;  // skip daytime rows
+    if (sunAlt > 0) continue;  // skip rows with the sun above the horizon (skycalc.c)
 
     const moon   = accumoon(jdt, site.lat, sid, site.elevsea);
     const moonHA = adjTime(sid - moon.topora);
     const { alt: moonAlt } = altit(moon.topodec, moonHA, site.lat);
 
     rows.push({
-      jdt, dh,
+      jdt, dh: i,
       localTime: fmtLocalTime(jdt, zone),
       localDate: fmtDate(caldat(jdt - zone/24)),
       ha, alt, az, secz, pa,
@@ -2550,10 +2589,18 @@ function computeObservability(state, startJD, endJD, sunAltDeg) {
       const curEpoch = 2000.0 + (jdmid - J2000) / 365.25;
       const prec = precrot(ra, dec, epoch, curEpoch);
 
-      // Evening twilight
-      const horiz = horizDeg(site);
-      const jdEveT  = jdSunAlt(sunAltDeg, jdmid - 6/24, site.lat, site.longit);
-      const jdMornT = jdSunAlt(sunAltDeg, jdmid + 6/24, site.lat, site.longit);
+      // Evening/morning twilight — hour-angle-based guesses at midnight
+      // (skycalc.c method), not fixed ±6 h clock offsets.
+      const stmid  = lst(jdmid, site.longit);
+      const sunMid = lpsun(jdmid);
+      const haTwi  = haAlt(sunMid.dec, site.lat, sunAltDeg);
+      let jdEveT = null, jdMornT = null;
+      if (haTwi <= 900 && haTwi >= -900) {
+        const e = jdSunAlt(sunAltDeg, jdmid + adjTime(sunMid.ra + haTwi - stmid) / 24, site.lat, site.longit);
+        const m = jdSunAlt(sunAltDeg, jdmid + adjTime(sunMid.ra - haTwi - stmid) / 24, site.lat, site.longit);
+        jdEveT  = e > -999 ? e : null;
+        jdMornT = m > -999 ? m : null;
+      }
 
       function objAt(jdt) {
         const sid = lst(jdt, site.longit);
@@ -2563,13 +2610,16 @@ function computeObservability(state, startJD, endJD, sunAltDeg) {
         return { ha, secz, alt };
       }
 
-      const eve  = jdEveT  > -999 ? objAt(jdEveT)  : null;
-      const ctr  = objAt(jdmid);
-      const morn = jdMornT > -999 ? objAt(jdMornT) : null;
+      // Center of the dark window = midpoint of the two twilights (skycalc.c's
+      // "center of night" concept), not clock midnight.
+      const jdCtr = (jdEveT && jdMornT) ? (jdEveT + jdMornT) / 2 : jdmid;
+      const eve  = jdEveT  ? objAt(jdEveT)  : null;
+      const ctr  = objAt(jdCtr);
+      const morn = jdMornT ? objAt(jdMornT) : null;
 
       // Count hours accessible
       let hrs3 = 0, hrs2 = 0, hrs1p5 = 0;
-      if (jdEveT > -999 && jdMornT > -999) {
+      if (jdEveT && jdMornT) {
         const step = 0.1 / 24;
         for (let jdt = jdEveT; jdt <= jdMornT; jdt += step) {
           const { secz, alt } = objAt(jdt);
@@ -2859,6 +2909,7 @@ function renderAlmanac() {
     ${evtRow('Nautical twilight morn', a.mornT12, 'nautical')}
     ${evtRow('Civil twilight morn', a.mornT6,  'civil')}
     ${evtRow('Sunrise',             a.sunrise, 'civil')}
+    ${evtRow('Night center',        a.nightCenter, 'astro')}
   </div>`;
 
   const illumPct = (a.moonIllumMid * 100).toFixed(0);

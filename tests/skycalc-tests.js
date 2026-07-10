@@ -612,8 +612,8 @@ function roundLocalHM(jd, zone) {
 }
 function sunEvtS1(alt, guess) { return jdSunAlt(alt, guess, AAT.lat, AAT.longit); }
 
-const almSunset  = sunEvtS1(-0.833 - ALM_HORIZ, jdMidS1 - 6/24);
-const almSunrise = sunEvtS1(-0.833 - ALM_HORIZ, jdMidS1 + 6/24);
+const almSunset  = sunEvtS1(-0.83 - ALM_HORIZ, jdMidS1 - 6/24);
+const almSunrise = sunEvtS1(-0.83 - ALM_HORIZ, jdMidS1 + 6/24);
 const almEve18   = sunEvtS1(-18, almSunset  + 1.5/24);
 const almMorn18  = sunEvtS1(-18, almSunrise - 1.5/24);
 const almEve12   = sunEvtS1(-12, almSunset  + 1/24);
@@ -621,6 +621,7 @@ const almMorn12  = sunEvtS1(-12, almSunrise - 1/24);
 
 checkEq('S1 sunset  (round to min)',       roundLocalHM(almSunset,  ALM_ZONE), '19:26');
 checkEq('S1 sunrise (round to min)',       roundLocalHM(almSunrise, ALM_ZONE), '07:00');
+checkEq('S1 night center (round to min)',  roundLocalHM((almSunset + almSunrise) / 2, ALM_ZONE), '01:13');
 checkEq('S1 eve  18deg twilight (round)',  roundLocalHM(almEve18,   ALM_ZONE), '20:43');
 checkEq('S1 morn 18deg twilight (round)',  roundLocalHM(almMorn18,  ALM_ZONE), '05:43');
 checkEq('S1 eve  12deg twilight (round)',  roundLocalHM(almEve12,   ALM_ZONE), '20:14');
