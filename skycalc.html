@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.2 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.3 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -491,7 +491,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.2</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.3</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2293,10 +2293,20 @@ function computeCircumstances(state) {
   const moonPhase = moonPhaseText(jd);
   // Illuminated fraction from the sun–moon elongation (skycalc.c ill_frac),
   // not the lunar-age approximation.
-  const moonIllum = 0.5 * (1 - Math.cos(
-    subtend(moon.topora, moon.topodec, sun.topora, sun.topodec)));
+  const sunMoonSep  = subtend(moon.topora, moon.topodec, sun.topora, sun.topodec);
+  const moonIllum   = 0.5 * (1 - Math.cos(sunMoonSep));
   const moonDistRad = subtend(prec.ra, prec.dec, moon.topora, moon.topodec);
   const moonDistDeg = moonDistRad * DEG_IN_RADIAN;
+  // Lunar contribution to sky brightness at the object (V mag/arcsec²),
+  // Krisciunas & Schaefer 1991 — as skycalc.c prints in print_circumstances.
+  // Only meaningful with the moon up, the object well clear of the horizon,
+  // and the sun well down (KZEN = 0.172 zenith extinction).
+  let moonSky = null;
+  if (moonAlt > 0 && alt > 0.5 && sunAlt < -9) {
+    const v = lunskybright(sunMoonSep * DEG_IN_RADIAN, moonDistDeg, 0.172,
+                           moonAlt, alt, moon.topodist);
+    if (v < 90) moonSky = v;   // lunskybright returns 99 when negligible
+  }
 
   const hc  = helcor(jd, prec.ra, prec.dec, ha, site.lat, site.elevsea);
   const bjd = jd + hc.tcor / SEC_IN_DAY;
@@ -2312,7 +2322,7 @@ function computeCircumstances(state) {
     prec,
     ha, alt, az, secz, pa,
     sunAlt,
-    moonAlt, moonPhase, moonIllum, moonDistDeg,
+    moonAlt, moonPhase, moonIllum, moonDistDeg, moonSky,
     hc, bjd, dt,
     gal, ecl
   };
@@ -2861,6 +2871,9 @@ function renderCircumstances() {
     kv('Moon phase',   c.moonPhase),
     kv('Moon illum.',  `${illumPct}% <span class="moon-illum-bar"><span class="moon-illum-fill" style="width:${illumPct}%"></span></span>`),
     kv('Moon dist.',   fmtDeg(c.moonDistDeg, 1)),
+    kv('Moon sky bright.', c.moonSky != null
+      ? `${c.moonSky.toFixed(1)} V mag/arcsec²`
+      : '<span style="color:var(--muted)">—</span>'),
   ].join(''));
 
   // CORRECTIONS card

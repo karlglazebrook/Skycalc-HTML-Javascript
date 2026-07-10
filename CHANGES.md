@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.8.3 — 2026-07-10
+
+### Circumstances — lunar sky brightness
+
+- Added a **Moon sky bright.** readout to the Circumstances "Sky" card: the lunar
+  contribution to sky brightness at the object, in V mag/arcsec² (Krisciunas &
+  Schaefer 1991), via the `lunskybright` model already ported in the math engine
+  but previously unused. Displayed only when the moon is up, the object is clear
+  of the horizon (> 0.5°), and the sun is below −9° — the same gating skycalc.c
+  uses in `print_circumstances` (KZEN = 0.172 zenith extinction); otherwise "—".
+
+---
+
 ## v0.8.2 — 2026-07-10
 
 ### Almanac / Hourly / Observability — closer fidelity to skycalc.c
