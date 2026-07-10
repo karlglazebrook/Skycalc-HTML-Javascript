@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.8.7 — 2026-07-10
+
+### Observability — faithful port of skycalc.c's `obs_season`
+
+A manual all-tabs comparison against a fresh `skycalc.c` run found the other four
+tabs (Circumstances, Almanac, Planets, Hourly) matched exactly, but the
+Observability tab diverged. `computeObservability` is now a faithful port of
+`obs_season` (+ `hrs_up`):
+
+- Each row is the night whose **local midnight (longitude-based, no DST)** is
+  nearest the lunar phase — fixing evening dates that were off by up to a day.
+- The **centre column** is now the sun's lower culmination (the natural centre
+  of night), not the dark-window midpoint.
+- Dark hours (< sec z 3 / 2 / 1.5) are computed by the **analytic `hrs_up`
+  crossing**, not a 0.1 h numerical scan.
+- Phase sequence, range bounds, and evening-date labelling match `obs_season`.
+
+Every row — dates, phase, eve/centre/morn HA & sec z (including "down"), and all
+three hour columns — now matches the C binary exactly for the AAT test scenario.
+
+### Tests
+
+- Added 9 end-to-end Observability assertions vs the C `obs_season` output; suite
+  is now 191 tests.
+
+### Note
+
+Corrects an earlier audit slip: `obs_season` *does* exist in `skycalc.c` (a
+faulty grep during the code sweep reported it absent), so the Observability tab
+does have a C reference — now matched.
+
+---
+
 ## v0.8.6 — 2026-07-10
 
 ### Almanac — LMST at each event

@@ -688,6 +688,18 @@ check  ('E2E almanac moon illum frac',e2eAlm.moonIllumMid,      0.135, 0.002);
 checkEq('E2E almanac LMST @ eve 18deg twi',  e2eAlm.eveT18.lmst,  '07:11');
 checkEq('E2E almanac LMST @ morn 18deg twi', e2eAlm.mornT18.lmst, '16:13');
 
+// Observability table vs C obs_season (range 2026-03-15..09-15, sun alt -18).
+const e2eObs = computeObservability(E2E_STATE, dateToJD(2026,3,15,12,0,0), dateToJD(2026,9,15,12,0,0), -18);
+checkEq('E2E obs row count',              e2eObs.length,        15);
+checkEq('E2E obs[0] phase (Full, Mar 3)', e2eObs[0].phase,      'F');
+checkEq('E2E obs[0] dark hrs <3',         e2eObs[0].hrs3,       '8.6');
+checkEq('E2E obs[0] dark hrs <1.5',       e2eObs[0].hrs1p5,     '7.2');
+checkEq('E2E obs[1] phase (New, Mar 18)', e2eObs[1].phase,      'N');
+checkEq('E2E obs[1] dark hrs <3',         e2eObs[1].hrs3,       '9.1');
+check  ('E2E obs[1] centre sec z',        e2eObs[1].ctr.secz,   1.0,  0.05);
+check  ('E2E obs[9] centre sec z (Jul14)',e2eObs[9].ctr.secz,   7.9,  0.15);
+checkEq('E2E obs[13] dark hrs <3 (Sep11)',e2eObs[13].hrs3,      '0.0');
+
 // ============================================================
 // Drift guard — verify skycalc.html's embedded math + compute blocks
 // are byte-identical to the source .js files, so the tests above

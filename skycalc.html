@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.6 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.7 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -498,7 +498,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.6</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.7</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2598,89 +2598,114 @@ function computeHourly(state) {
 }
 
 // ── Compute Observability ──────────────────────────────────────────
+// hrs_up (skycalc.c): hours an object is up AND it's dark, given the JDs it
+// rises past / sets below a target altitude (jdup/jddown, the crossings around
+// the transit nearest midnight) and the evening/morning twilight JDs. Handles
+// circumpolar objects that come back up a second time before morning.
+function hrsUp(jdup, jddown, jdeve, jdmorn) {
+  const SID_RATE = 1.0027379093;
+  if (jdup < jdeve) {
+    if (jddown >= jdmorn) return (jdmorn - jdeve) * 24;          // up all night
+    if (jddown >= jdeve) {
+      const jdup2 = jdup + 1.0 / SID_RATE;
+      return (jdup2 > jdmorn) ? (jddown - jdeve) * 24
+                              : ((jddown - jdeve) + (jdmorn - jdup2)) * 24;
+    }
+    return 0;
+  }
+  if (jddown > jdmorn) {
+    if (jdup >= jdmorn) return 0;
+    const jddown0 = jddown - 1.0 / SID_RATE;
+    return (jddown0 < jdeve) ? (jdmorn - jdup) * 24
+                             : ((jddown0 - jdeve) + (jdmorn - jdup)) * 24;
+  }
+  return (jddown - jdup) * 24;   // up & down the same night
+}
+
+// Faithful port of skycalc.c's obs_season: tabulates observability at each new
+// and full moon between startJD and endJD. Each row is the night whose LOCAL
+// MIDNIGHT (longitude-based, no DST) is nearest that lunar phase; HA and sec z
+// are given at evening twilight, the sun's lower culmination (the natural
+// centre of night), and morning twilight; then the number of dark hours the
+// object spends below sec z 3, 2 and 1.5 (analytic, via hrsUp).
 function computeObservability(state, startJD, endJD, sunAltDeg) {
   const { site, ra, dec, epoch } = state;
+  const lon = site.longit, lat = site.lat;
+  const ALT_3 = 19.47, ALT_2 = 30.0, ALT_15 = 41.81, SID_RATE = 1.0027379093;
 
+  // Object precessed to the middle of the requested range (used for all rows),
+  // and the phase counter seeded at the last new moon at/before the start.
   const la0 = lunAge(startJD);
   let nlun = la0.nlun;
-  // Back up one to ensure we don't miss the first event
-  nlun = nlun - 1;
+  let jd = startJD - la0.age;
+  let nph = 0;
 
-  const results = [];
+  const curEpoch = 2000.0 + ((jd + endJD) / 2 - J2000) / 365.25;
+  const prec = precrot(ra, dec, epoch, curEpoch);
+  const { min: minAlt, max: maxAlt } = minMaxAlt(lat, prec.dec);
 
-  for (let iter = 0; iter < 60; iter++) {
-    for (const nph of [0, 2]) { // 0=new, 2=full
-      const jdPhase = flmoon(nlun, nph);
-      if (jdPhase < startJD - 2 || jdPhase > endJD + 2) continue;
-
-      const { zone } = getDSTInfo(jdPhase, site);
-      const locCal   = jdToLocalCal(jdPhase, zone);
-      const y = locCal.y, mo = locCal.mo, d = locCal.d;
-      const jdMidnightLocal = dateToJD(y, mo, d, 24, 0, 0);
-      const jdmid = jdMidnightLocal + zone / 24;
-
-      if (jdmid < startJD || jdmid > endJD) continue;
-
-      const curEpoch = 2000.0 + (jdmid - J2000) / 365.25;
-      const prec = precrot(ra, dec, epoch, curEpoch);
-
-      // Evening/morning twilight — hour-angle-based guesses at midnight
-      // (skycalc.c method), not fixed ±6 h clock offsets.
-      const stmid  = lst(jdmid, site.longit);
-      const sunMid = lpsun(jdmid);
-      const haTwi  = haAlt(sunMid.dec, site.lat, sunAltDeg);
-      let jdEveT = null, jdMornT = null;
-      if (haTwi <= 900 && haTwi >= -900) {
-        const e = jdSunAlt(sunAltDeg, jdmid + adjTime(sunMid.ra + haTwi - stmid) / 24, site.lat, site.longit);
-        const m = jdSunAlt(sunAltDeg, jdmid + adjTime(sunMid.ra - haTwi - stmid) / 24, site.lat, site.longit);
-        jdEveT  = e > -999 ? e : null;
-        jdMornT = m > -999 ? m : null;
-      }
-
-      function objAt(jdt) {
-        const sid = lst(jdt, site.longit);
-        const ha  = adjTime(sid - prec.ra);
-        const { alt } = altit(prec.dec, ha, site.lat);
-        const secz = secantZ(alt);
-        return { ha, secz, alt };
-      }
-
-      // Center of the dark window = midpoint of the two twilights (skycalc.c's
-      // "center of night" concept), not clock midnight.
-      const jdCtr = (jdEveT && jdMornT) ? (jdEveT + jdMornT) / 2 : jdmid;
-      const eve  = jdEveT  ? objAt(jdEveT)  : null;
-      const ctr  = objAt(jdCtr);
-      const morn = jdMornT ? objAt(jdMornT) : null;
-
-      // Count hours accessible
-      let hrs3 = 0, hrs2 = 0, hrs1p5 = 0;
-      if (jdEveT && jdMornT) {
-        const step = 0.1 / 24;
-        for (let jdt = jdEveT; jdt <= jdMornT; jdt += step) {
-          const { secz, alt } = objAt(jdt);
-          if (alt > 0 && secz < 100) {
-            hrs3   += (secz < 3.0)   ? step * 24 : 0;
-            hrs2   += (secz < 2.0)   ? step * 24 : 0;
-            hrs1p5 += (secz < 1.5)   ? step * 24 : 0;
-          }
-        }
-      }
-
-      results.push({
-        jdPhase,
-        phase: nph === 0 ? 'N' : 'F',
-        dateStr: fmtDate(locCal),
-        eve, ctr, morn,
-        hrs3:   hrs3.toFixed(1),
-        hrs2:   hrs2.toFixed(1),
-        hrs1p5: hrs1p5.toFixed(1),
-      });
-    }
-    nlun++;
-    if (flmoon(nlun, 0) > endJD + 60) break;
+  function objAt(jdt) {
+    const ha = adjTime(lst(jdt, lon) - prec.ra);
+    const { alt } = altit(prec.dec, ha, lat);
+    return { ha, secz: secantZ(alt), alt };
   }
 
-  results.sort((a, b) => a.jdPhase - b.jdPhase);
+  const results = [];
+  let guard = 0;
+  while (jd <= endJD && guard++ < 500) {
+    if (nph === 0) nph = 2;
+    else if (nph === 2) { nlun++; nph = 0; }
+    jd = flmoon(nlun, nph);
+
+    // Local midnight nearest the phase instant (longitude-based, no DST).
+    const midnfrac = 0.5 + lon / 24;
+    let jdmid = Math.trunc(jd) + midnfrac;
+    if (jd - jdmid > 0.5) jdmid += 1;
+    else if (jd - jdmid < -0.5) jdmid -= 1;
+
+    // Sun's lower culmination = natural centre of night.
+    const sun = lpsun(jdmid);
+    const hasun = adjTime(lst(jdmid, lon) - sun.ra);
+    const jdcent = hasun > 0 ? jdmid + (12 - hasun) / 24 : jdmid - (hasun + 12) / 24;
+
+    // Evening / morning twilight at the chosen sun altitude.
+    const hatwi = haAlt(sun.dec, lat, sunAltDeg);
+    let jdeve = null, jdmorn = null;
+    if (hatwi > 100) { /* no twilight — sun never reaches that altitude */ }
+    else if (hatwi < -100) { jdeve = jdcent - 0.5; jdmorn = jdcent + 0.5; } // dark all day
+    else {
+      jdeve  = jdSunAlt(sunAltDeg, jdcent - (12 - hatwi) / 24, lat, lon);
+      jdmorn = jdSunAlt(sunAltDeg, jdcent + (12 - hatwi) / 24, lat, lon);
+    }
+
+    const eve  = jdeve  ? objAt(jdeve)  : null;
+    const ctr  = objAt(jdcent);
+    const morn = jdmorn ? objAt(jdmorn) : null;
+
+    // Dark hours below sec z 3 / 2 / 1.5 via the analytic hrsUp crossing.
+    const jdtrans = jdcent - ctr.ha / (SID_RATE * 24);   // transit nearest midnight
+    function hoursAt(altLimit) {
+      if (!jdeve) return 0;                               // twilight all night / never
+      if (minAlt < altLimit && maxAlt > altLimit) {
+        const dt = haAlt(prec.dec, lat, altLimit) / (SID_RATE * 24);
+        return hrsUp(jdtrans - dt, jdtrans + dt, jdeve, jdmorn);
+      }
+      return (minAlt > altLimit) ? 24 * (jdmorn - jdeve) : 0;
+    }
+
+    // Evening date (skycalc.c: jdcent - longit/24 - 0.25).
+    const eveCal = caldat(jdcent - lon / 24 - 0.25);
+
+    results.push({
+      jdPhase: jd,
+      phase:   nph === 0 ? 'N' : 'F',
+      dateStr: fmtDate(eveCal),
+      eve, ctr, morn,
+      hrs3:   hoursAt(ALT_3).toFixed(1),
+      hrs2:   hoursAt(ALT_2).toFixed(1),
+      hrs1p5: hoursAt(ALT_15).toFixed(1),
+    });
+  }
   return results;
 }
 //<<<END:skycalc-compute.js>>>

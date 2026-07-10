@@ -1,6 +1,6 @@
 # Test Suite — skycalc-tests.js
 
-182 tests, all passing. Run with:
+191 tests, all passing. Run with:
 
 ```bash
 ./run-tests.sh
