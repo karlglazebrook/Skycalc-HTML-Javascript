@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.5 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.6 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -300,6 +300,13 @@ select:focus, input:focus {
   color: var(--muted);
 }
 
+.event-lmst {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
 .dark-hours-box {
   background: var(--surface);
   border: 1px solid var(--accent);
@@ -491,7 +498,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.5</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.6</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2207,6 +2214,14 @@ function fmtLocalTimeSec(jd, zone) {
   return `${String(c.h).padStart(2,'0')}:${String(c.mn).padStart(2,'0')}:${String(Math.round(c.s)).padStart(2,'0')}`;
 }
 
+// Sidereal time as HH:MM, rounded to the nearest minute and wrapped to [0,24),
+// matching skycalc.c's put_coords(...,0) for the LMST-at-event readouts.
+function fmtSidHM(hrs) {
+  let m = Math.round(hrs * 60);
+  m = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2,'0')}:${String(m % 60).padStart(2,'0')}`;
+}
+
 function fmtDate(cal) {
   return `${DAYS_SHORT[cal.dow]} ${cal.d} ${MONTHS[cal.mo-1]} ${cal.y}`;
 }
@@ -2457,10 +2472,11 @@ function computeAlmanac(state) {
   }
 
   function fmt(jd_evt) {
-    if (!jd_evt) return { local: '—', ut: '' };
+    if (!jd_evt) return { local: '—', ut: '', lmst: '' };
     return {
       local: fmtLocalTime(jd_evt, zone),
       ut:    fmtUTTime(jd_evt),
+      lmst:  fmtSidHM(lst(jd_evt, site.longit)),
     };
   }
 
@@ -2910,11 +2926,13 @@ function renderCircumstances() {
 // ── Render Almanac ─────────────────────────────────────────────────
 function evtRow(label, times, cls) {
   const lcls = cls ? ` class="${cls}"` : '';
+  const lmstLine = times.lmst ? `<div class="event-lmst">LMST ${times.lmst}</div>` : '';
   return `<div class="almanac-event">
     <span class="event-label">${label}</span>
     <div class="event-times">
       <div class="event-local${lcls}">${times.local}</div>
       <div class="event-ut">${times.ut}</div>
+      ${lmstLine}
     </div>
   </div>`;
 }

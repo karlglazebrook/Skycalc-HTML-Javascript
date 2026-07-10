@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.8.6 — 2026-07-10
+
+### Almanac — LMST at each event
+
+- Every event in the Almanac's **Sun & twilight** card (and moonrise/set) now
+  shows the **Local Mean Sidereal Time** at that moment, beneath the UT time —
+  as skycalc.c prints ("LMST at evening/morning twilight"). Rounded to the
+  nearest minute, like the other event times, and shown in accent colour to set
+  it apart from UT.
+
+### Tests
+
+- Added LMST fidelity assertions vs the C binary (eve/morn 18° twilight = 07:11
+  / 16:13); suite is now 182 tests.
+
+---
+
 ## v0.8.5 — 2026-07-10
 
 ### Docs

@@ -108,6 +108,14 @@ function fmtLocalTimeSec(jd, zone) {
   return `${String(c.h).padStart(2,'0')}:${String(c.mn).padStart(2,'0')}:${String(Math.round(c.s)).padStart(2,'0')}`;
 }
 
+// Sidereal time as HH:MM, rounded to the nearest minute and wrapped to [0,24),
+// matching skycalc.c's put_coords(...,0) for the LMST-at-event readouts.
+function fmtSidHM(hrs) {
+  let m = Math.round(hrs * 60);
+  m = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2,'0')}:${String(m % 60).padStart(2,'0')}`;
+}
+
 function fmtDate(cal) {
   return `${DAYS_SHORT[cal.dow]} ${cal.d} ${MONTHS[cal.mo-1]} ${cal.y}`;
 }
@@ -358,10 +366,11 @@ function computeAlmanac(state) {
   }
 
   function fmt(jd_evt) {
-    if (!jd_evt) return { local: '—', ut: '' };
+    if (!jd_evt) return { local: '—', ut: '', lmst: '' };
     return {
       local: fmtLocalTime(jd_evt, zone),
       ut:    fmtUTTime(jd_evt),
+      lmst:  fmtSidHM(lst(jd_evt, site.longit)),
     };
   }
 

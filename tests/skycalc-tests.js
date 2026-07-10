@@ -685,6 +685,8 @@ checkEq('E2E almanac night center',   e2eAlm.nightCenter.local, '01:13');
 checkEq('E2E almanac moonrise',       e2eAlm.moonrise.local,    '03:45');
 checkEq('E2E almanac moonset',        e2eAlm.moonset.local,     '17:14');
 check  ('E2E almanac moon illum frac',e2eAlm.moonIllumMid,      0.135, 0.002);
+checkEq('E2E almanac LMST @ eve 18deg twi',  e2eAlm.eveT18.lmst,  '07:11');
+checkEq('E2E almanac LMST @ morn 18deg twi', e2eAlm.mornT18.lmst, '16:13');
 
 // ============================================================
 // Drift guard — verify skycalc.html's embedded math + compute blocks
