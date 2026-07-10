@@ -99,7 +99,7 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 | File | Description |
 |------|-------------|
 | `skycalc.html` | The complete single-file web app |
-| `index.html` | Byte-for-byte copy of `skycalc.html`, served at the GitHub Pages root |
+| `index.html` | Tiny redirect to `skycalc.html`, so the GitHub Pages root URL opens the app |
 | `skycalc-math.js` | Math engine (source for the embedded block in the HTML) |
 | `skycalc.c` | Original C source by John Thorstensen |
 | `run-tests.sh` | Test runner (requires macOS JavaScriptCore) |
