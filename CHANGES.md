@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.8 — 2026-07-10
+
+### Time display & input (Circumstances top row)
+
+- **Default to local site time.** The date/time inputs now default to the
+  selected observatory's local time (UT checkbox starts unchecked), so the
+  displayed date matches the site's civil date rather than the UT date.
+- **Always-visible local readout.** The top row now shows
+  `Local: <date> <time> (UTC±N)` alongside the input fields, regardless of
+  the UT checkbox.
+- **24-hour time field.** The time input is now a 24-hour text field
+  (`HH:MM:SS`) instead of a native `<input type="time">`, which rendered as
+  12-hour AM/PM on 12-hour-locale systems. Accepts colon- or space-separated
+  entry.
+- **UT checkbox fixes:**
+  - Input fields now honor the checkbox — UT when checked, local when
+    unchecked (previously always showed UT, so NOW-mode ignored the box).
+  - Toggling now converts the same instant between UT and local instead of
+    reinterpreting the visible digits (which shifted the time by the zone offset).
+- Header JD/LMST and the local readout now populate immediately on load.
+
+### Almanac
+
+- **Rounded event times.** Sunset, sunrise, twilight and moonrise/set now
+  round to the nearest minute, matching skycalc.c's `print_time(...,0)`.
+  Previously truncated, showing times up to ~1 min early (e.g. sunset 17:19
+  vs the C binary's 17:20).
+- **Clearer card title.** The Sun card is retitled from "Sun" to
+  "**Sun & twilight — night of \<evening\> → \<morning\>**", removing the
+  Sun/Sunday ambiguity and making the observing-night span explicit.
+
+### Tests
+
+- Added 6 almanac rounding-fidelity assertions vs the C binary (scenario 1),
+  bringing the suite to **159 tests**.
+
+---
+
 ## v0.7 — 2026-03-16
 
 ### Repository tidy-up

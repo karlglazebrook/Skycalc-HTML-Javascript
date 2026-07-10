@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.7 — Astronomical Calculator</title>
+<title>SKYCALC v0.8 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -129,6 +129,14 @@ select:focus, input:focus {
 }
 
 #header-jd-lmst span { color: var(--accent); }
+
+.local-readout {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.local-readout span { color: var(--accent); }
 
 /* ── Tabs ── */
 #tabs {
@@ -483,7 +491,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.7</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -502,12 +510,14 @@ select:focus, input:focus {
     <button id="now-btn" class="active">■ NOW</button>
 
     <input type="date" id="date-input">
-    <input type="time" id="time-input" step="1">
+    <input type="text" id="time-input" placeholder="23:30:00">
 
     <label class="ut-label">
-      <input type="checkbox" id="ut-check" checked>
+      <input type="checkbox" id="ut-check">
       UT
     </label>
+
+    <span class="local-readout">Local: <span id="local-now">—</span></span>
 
     <div id="header-jd-lmst">
       JD: <span id="hdr-jd">—</span> &nbsp;|&nbsp; LMST: <span id="hdr-lmst">—</span>
@@ -2178,7 +2188,8 @@ function fmtDeg(deg, dec) {
 }
 
 function fmtLocalTime(jd, zone) {
-  const c = caldat(jd - zone / 24);
+  // Round to the nearest minute, matching skycalc.c's print_time(...,0).
+  const c = caldat(jd - zone / 24 + 0.5 / 1440);
   return `${String(c.h).padStart(2,'0')}:${String(c.mn).padStart(2,'0')}`;
 }
 
@@ -2191,12 +2202,22 @@ function fmtDate(cal) {
   return `${DAYS_SHORT[cal.dow]} ${cal.d} ${MONTHS[cal.mo-1]} ${cal.y}`;
 }
 
+// "night of" span, e.g. "Thu 9 → Fri 10 Jul 2026". Month/year on the
+// evening side are dropped when they match the morning side.
+function fmtNightSpan(eve, morn) {
+  let evePart = `${DAYS_SHORT[eve.dow]} ${eve.d}`;
+  if (eve.mo !== morn.mo || eve.y !== morn.y) evePart += ` ${MONTHS[eve.mo-1]}`;
+  if (eve.y !== morn.y) evePart += ` ${eve.y}`;
+  return `${evePart} → ${fmtDate(morn)}`;
+}
+
 function fmtFullTime(cal) {
   return `${String(cal.h).padStart(2,'0')}:${String(cal.mn).padStart(2,'0')}:${String(Math.round(cal.s)).padStart(2,'0')}`;
 }
 
 function fmtUTTime(jd) {
-  const c = caldat(jd);
+  // Round to the nearest minute, matching skycalc.c's print_time(...,0).
+  const c = caldat(jd + 0.5 / 1440);
   return `${String(c.h).padStart(2,'0')}:${String(c.mn).padStart(2,'0')} UT`;
 }
 
@@ -2316,6 +2337,11 @@ function computeAlmanac(state) {
   const jdMidnightLocal = dateToJD(y, mo, d, 24, 0, 0);
   const jdmid = jdMidnightLocal + zone / 24;
 
+  // Evening (sunset) and morning (sunrise) dates that bound this night.
+  const jdEveNoon = dateToJD(y, mo, d, 12, 0, 0);
+  const eveCal  = caldat(jdEveNoon);
+  const mornCal = caldat(jdEveNoon + 1);
+
   const horiz = horizDeg(site);
 
   function sunEvt(alt, guess) {
@@ -2405,6 +2431,7 @@ function computeAlmanac(state) {
     moonPhaseMid: moonPhaseText(jdmid),
     lmstMid,
     locDate: fmtDate(locCal),
+    nightSpan: fmtNightSpan(eveCal, mornCal),
   };
 }
 
@@ -2592,6 +2619,7 @@ const elTime      = document.getElementById('time-input');
 const elUTCheck   = document.getElementById('ut-check');
 const elHdrJD     = document.getElementById('hdr-jd');
 const elHdrLMST   = document.getElementById('hdr-lmst');
+const elLocalNow  = document.getElementById('local-now');
 const elModalOver = document.getElementById('modal-overlay');
 
 // ── Site dropdown ─────────────────────────────────────────────────
@@ -2606,7 +2634,15 @@ function populateSiteSelect() {
 
 // ── Time input sync ────────────────────────────────────────────────
 function updateTimeInputsFromJD(jd) {
-  const c = caldat(jd);
+  // Fields show UT when the UT box is checked, otherwise local site time —
+  // matching how jdFromInputs() interprets them.
+  let c;
+  if (elUTCheck.checked) {
+    c = caldat(jd);
+  } else {
+    const { zone } = getDSTInfo(jd, AppState.site);
+    c = jdToLocalCal(jd, zone);
+  }
   const yy = String(c.y).padStart(4,'0');
   const mm = String(c.mo).padStart(2,'0');
   const dd = String(c.d).padStart(2,'0');
@@ -2621,7 +2657,7 @@ function jdFromInputs() {
   const dateParts = elDate.value.split('-').map(Number);
   if (dateParts.length < 3 || isNaN(dateParts[0])) return nowToJD();
   const [y, mo, d] = dateParts;
-  const timeParts  = elTime.value.split(':').map(Number);
+  const timeParts  = elTime.value.trim().split(/[:\s]+/).map(Number);
   const h  = timeParts[0] || 0;
   const mn = timeParts[1] || 0;
   const s  = timeParts[2] || 0;
@@ -2643,6 +2679,7 @@ function startNowMode() {
   elNowBtn.classList.add('active');
   AppState.jdUT = nowToJD();
   updateTimeInputsFromJD(AppState.jdUT);
+  updateHeaderJD();
   if (AppState.nowTimer) clearInterval(AppState.nowTimer);
   AppState.nowTimer = setInterval(() => {
     if (!AppState.isNowMode) return;
@@ -2666,6 +2703,18 @@ function updateHeaderJD() {
   const lmst = lst(jd, AppState.site.longit);
   elHdrJD.textContent   = jd.toFixed(5);
   elHdrLMST.textContent = fmtHMSplain(lmst);
+  updateLocalReadout();
+}
+
+// Always-visible local site date/time in the top row, so both UT (in the
+// input fields) and local time are shown at once regardless of the UT box.
+function updateLocalReadout() {
+  const jd = AppState.jdUT;
+  const { zone } = getDSTInfo(jd, AppState.site);
+  const loc = jdToLocalCal(jd, zone);
+  const zSign = zone <= 0 ? '+' : '−';
+  const zAbs  = Math.abs(zone);
+  elLocalNow.textContent = `${fmtDate(loc)} ${fmtFullTime(loc)} (UTC${zSign}${zAbs})`;
 }
 
 // ── Tab switching ─────────────────────────────────────────────────
@@ -2790,7 +2839,7 @@ function renderAlmanac() {
   const a = computeAlmanac(AppState);
 
   const sunSection = `<div class="almanac-card">
-    <div class="card-title">Sun — ${a.locDate}</div>
+    <div class="card-title">Sun &amp; twilight — night of ${a.nightSpan}</div>
     ${evtRow('Sunset',              a.sunset,  'civil')}
     ${evtRow('Civil twilight eve',  a.eveT6,   'civil')}
     ${evtRow('Nautical twilight eve', a.eveT12, 'nautical')}
@@ -3083,8 +3132,9 @@ elTime.addEventListener('change', () => {
 });
 
 elUTCheck.addEventListener('change', () => {
-  stopNowMode();
-  AppState.jdUT = jdFromInputs();
+  // Toggle only the display timescale — keep the same instant and re-show it
+  // as UT or local, rather than reinterpreting the visible digits.
+  updateTimeInputsFromJD(AppState.jdUT);
   renderActiveTab();
   updateHeaderJD();
 });

@@ -592,6 +592,41 @@ const moonAlt4 = altit(moon4.topodec, lmst4 - moon4.topora, MK.lat).alt;
 check('S4 moon is below horizon', moonAlt4 < 0 ? 0 : 1, 0, 0.5);
 
 // ============================================================
+// Almanac event times — minute-rounding fidelity to skycalc.c
+//   Scenario 1: AAT Siding Spring, night of 2026-Mar-15 eve -> Mar-16 morn.
+//   Expected values are the times printed by the C binary
+//   (tests/c_output_s1.txt), which uses print_time(...,0) = round-to-minute.
+//   The app's fmtLocalTime/fmtUTTime apply the same rounding (jd + 30s,
+//   then truncate); this guards against a regression back to truncation.
+// ============================================================
+section('Almanac rounded event times vs C binary (scenario 1)');
+
+const ALM_ZONE  = -11;   // ADT: March = southern DST at AAT (local = UT + 11)
+const ALM_HORIZ = Math.sqrt(2 * 670 / 6378140) * DEG_IN_RADIAN;  // 670 m horizon dip
+const jdMidS1   = dateToJD(2026, 3, 16, 0, 0, 0) + ALM_ZONE / 24; // UT of local midnight
+
+// Round a JD to the nearest local minute, exactly as fmtLocalTime() does.
+function roundLocalHM(jd, zone) {
+    const c = caldat(jd - zone / 24 + 0.5 / 1440);
+    return String(c.h).padStart(2, '0') + ':' + String(c.mn).padStart(2, '0');
+}
+function sunEvtS1(alt, guess) { return jdSunAlt(alt, guess, AAT.lat, AAT.longit); }
+
+const almSunset  = sunEvtS1(-0.833 - ALM_HORIZ, jdMidS1 - 6/24);
+const almSunrise = sunEvtS1(-0.833 - ALM_HORIZ, jdMidS1 + 6/24);
+const almEve18   = sunEvtS1(-18, almSunset  + 1.5/24);
+const almMorn18  = sunEvtS1(-18, almSunrise - 1.5/24);
+const almEve12   = sunEvtS1(-12, almSunset  + 1/24);
+const almMorn12  = sunEvtS1(-12, almSunrise - 1/24);
+
+checkEq('S1 sunset  (round to min)',       roundLocalHM(almSunset,  ALM_ZONE), '19:26');
+checkEq('S1 sunrise (round to min)',       roundLocalHM(almSunrise, ALM_ZONE), '07:00');
+checkEq('S1 eve  18deg twilight (round)',  roundLocalHM(almEve18,   ALM_ZONE), '20:43');
+checkEq('S1 morn 18deg twilight (round)',  roundLocalHM(almMorn18,  ALM_ZONE), '05:43');
+checkEq('S1 eve  12deg twilight (round)',  roundLocalHM(almEve12,   ALM_ZONE), '20:14');
+checkEq('S1 morn 12deg twilight (round)',  roundLocalHM(almMorn12,  ALM_ZONE), '06:11');
+
+// ============================================================
 // Summary
 // ============================================================
 

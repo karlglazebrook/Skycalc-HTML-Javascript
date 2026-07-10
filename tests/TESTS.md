@@ -1,6 +1,6 @@
 # Test Suite — skycalc-tests.js
 
-153 tests, all passing. Run with:
+159 tests, all passing. Run with:
 
 ```bash
 ./run-tests.sh
@@ -30,6 +30,8 @@ The suite is organised in two parts:
 | 4 | 2099-Nov-10 14:00 | RA 0h42m Dec +41° (M31 Andromeda) | Mauna Kea, HI |
 
 Scenarios 2 and 3 intentionally include below-horizon and daytime cases (testing the math in non-observable conditions). Four distinct DST regimes are covered: Australian, Chilean, and two no-DST sites (MST, HST).
+
+A final section, **Almanac rounded event times**, asserts the scenario-1 sunset, sunrise, and 18°/12° twilight times *to the exact minute* against the C binary output (`c_output_s1.txt`). The C program rounds these via `print_time(...,0)`; this section locks the JS port's `fmtLocalTime`/`fmtUTTime` rounding to match, guarding against a regression back to truncation.
 
 ---
 
