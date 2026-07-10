@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.8.8 — 2026-07-10
+
+### Circumstances / Hourly — display polish to match skycalc.c
+
+- Relabelled the Circumstances correction rows **"Helio Δt/Δv" → "Bary Δt/Δv"**,
+  matching skycalc.c's "Barycentric corrections" (the values were already the
+  barycentric ones, and BJD was already labelled as such — only these two labels
+  were inconsistent).
+- The **Hourly** airmass table now blanks the Sun-altitude column as **"…"** when
+  the sun is below −18° (fully dark), matching skycalc.c, instead of printing the
+  irrelevant large-negative value.
+
+Render only — no change to any computed number.
+
+---
+
 ## v0.8.7 — 2026-07-10
 
 ### Observability — faithful port of skycalc.c's `obs_season`

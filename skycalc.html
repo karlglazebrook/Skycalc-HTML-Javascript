@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.7 — Astronomical Calculator</title>
+<title>SKYCALC v0.8.8 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -498,7 +498,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.7</span></div>
+    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.8</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -2929,8 +2929,8 @@ function renderCircumstances() {
 
   // CORRECTIONS card
   const corrCard = card('Corrections', [
-    kv('Helio &Delta;t', `${c.hc.tcor.toFixed(2)} s`),
-    kv('Helio &Delta;v', `${c.hc.vcor.toFixed(3)} km/s`),
+    kv('Bary &Delta;t', `${c.hc.tcor.toFixed(2)} s`),
+    kv('Bary &Delta;v', `${c.hc.vcor.toFixed(3)} km/s`),
     kv('BJD',            c.bjd.toFixed(5)),
   ].join(''));
 
@@ -3075,7 +3075,7 @@ function renderHourly() {
     const below    = r.alt < 0;
     const seczStr  = (!below && r.secz < 100) ? r.secz.toFixed(2) : '—';
     const moonStr  = r.moonAlt > 0 ? r.moonAlt.toFixed(1)+'&deg;' : '<span style="color:var(--muted)">—</span>';
-    const sunStr   = r.sunAlt < -18 ? `<span class="night">${r.sunAlt.toFixed(1)}&deg;</span>`
+    const sunStr   = r.sunAlt < -18 ? '<span style="color:var(--muted)">…</span>'
                    : `<span class="${scls}">${r.sunAlt.toFixed(1)}&deg;</span>`;
 
     // Date separator
