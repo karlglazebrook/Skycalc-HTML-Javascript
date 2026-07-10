@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKYCALC v0.8.9 — Astronomical Calculator</title>
+<title>SkyCalc HTML v0.9.0 — Astronomical Calculator</title>
 <style>
 :root {
   --bg:      #0d1117;
@@ -172,6 +172,13 @@ select:focus, input:focus {
 
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
+
+.credits { max-width: 680px; margin: 6px auto; }
+.credits .card { margin-bottom: 14px; }
+.credits p { margin: 10px 0 0; line-height: 1.55; font-size: 13px; color: var(--text); }
+.credits a { color: var(--accent); text-decoration: none; }
+.credits a:hover { text-decoration: underline; }
+.credits code { font-family: 'Cascadia Code','Fira Code',Consolas,monospace; color: var(--accent); font-size: 0.9em; }
 
 /* ── Cards (Circumstances) ── */
 .cards-grid {
@@ -498,7 +505,7 @@ select:focus, input:focus {
 ══════════════════════════════════════════════ -->
 <div id="header">
   <div class="header-row1">
-    <div class="logo">SKYCALC <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.8.9</span></div>
+    <div class="logo">SkyCalc HTML <span style="font-size:0.55em;opacity:0.6;font-weight:400;letter-spacing:0">v0.9.0</span></div>
 
     <span class="header-label">Site:</span>
     <select id="site-select"></select>
@@ -541,6 +548,7 @@ select:focus, input:focus {
   <button class="tab-btn" data-tab="planets">Planets</button>
   <button class="tab-btn" data-tab="hourly">Hourly</button>
   <button class="tab-btn" data-tab="observability">Observability</button>
+  <button class="tab-btn" data-tab="credits">Credits</button>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -579,6 +587,35 @@ select:focus, input:focus {
       <button id="obs-compute-btn">Compute</button>
     </div>
     <div id="obs-content"></div>
+  </div>
+
+  <!-- CREDITS -->
+  <div id="pane-credits" class="tab-pane">
+    <div class="credits">
+      <div class="card">
+        <div class="card-title">About SkyCalc HTML</div>
+        <p>A single-file, dependency-free browser port of the classic
+        <code>skycalc.c</code> astronomical calculator — no server, no build
+        step, no external libraries. Open the file and go.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Original program</div>
+        <p><strong>skycalc.c</strong> was written by <strong>John
+        Thorstensen</strong>, Department of Physics &amp; Astronomy, Dartmouth
+        College, and has been widely used at observatories for decades. Every
+        astronomical algorithm in this web app is a faithful port of that C
+        code, validated number-for-number against the compiled binary.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">This browser port</div>
+        <p>HTML/JavaScript version by <strong>Karl Glazebrook</strong>
+        (Swinburne University of Technology), developed collaboratively with
+        <strong>Claude</strong> (Anthropic). Released under the MIT License.</p>
+        <p>Source, tests, and version history:<br>
+        <a href="https://github.com/karlglazebrook/Skycalc-HTML-Javascript"
+           target="_blank" rel="noopener">github.com/karlglazebrook/Skycalc-HTML-Javascript</a></p>
+      </div>
+    </div>
   </div>
 
 </div>

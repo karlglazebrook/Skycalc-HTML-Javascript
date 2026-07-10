@@ -15,6 +15,7 @@ A single-file HTML/JavaScript port of **John Thorstensen's** (Dartmouth College)
 - **Planets** — All 9 planets + Sun + Moon: RA, Dec, HA, altitude, azimuth, airmass
 - **Hourly Airmass** — Hourly table through the observing night
 - **Observability** — Seasonal new/full-moon table over a user-specified date range
+- **Credits** — Attribution for the original `skycalc.c` and this port
 - **▶ NOW mode** — Live 1-second update from system clock
 - **14 preset sites** — AAT (default), Kitt Peak, ESO, VLT, Palomar, Mauna Kea, Lick, and more
 - **Custom site** — Enter any latitude, longitude, elevation, and timezone

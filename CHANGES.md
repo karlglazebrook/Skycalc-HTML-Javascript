@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.0 — 2026-07-10
+
+### UI
+
+- Renamed the top-left logo to **SkyCalc HTML** (and the browser tab title to
+  match).
+- Added a **Credits** tab crediting the original `skycalc.c` by **John
+  Thorstensen** (Dartmouth College), this HTML/JavaScript port, and the MIT
+  license, with a link to the source repository.
+
+---
+
 ## v0.8.9 — 2026-07-10
 
 ### UI
