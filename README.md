@@ -2,6 +2,8 @@
 
 A single-file HTML/JavaScript port of **John Thorstensen's** (Dartmouth College) classic `skycalc.c` astronomical calculator. Open `skycalc.html` in any modern browser — no server, no build step, no dependencies.
 
+**▶ Live demo: <https://karlglazebrook.github.io/Skycalc-HTML-Javascript/>**
+
 ![Dark observatory theme with five tabs: Circumstances, Almanac, Planets, Hourly Airmass, Observability](https://raw.githubusercontent.com/karlglazebrook/Skycalc-HTML-Javascript/main/screenshot.png)
 
 ---
@@ -97,6 +99,7 @@ All tests pass with tight tolerances (≤ 0.001 hr for RA, ≤ 0.01° for angles
 | File | Description |
 |------|-------------|
 | `skycalc.html` | The complete single-file web app |
+| `index.html` | Byte-for-byte copy of `skycalc.html`, served at the GitHub Pages root |
 | `skycalc-math.js` | Math engine (source for the embedded block in the HTML) |
 | `skycalc.c` | Original C source by John Thorstensen |
 | `run-tests.sh` | Test runner (requires macOS JavaScriptCore) |
